@@ -1,55 +1,20 @@
 "use client";
 
+import AuthCard from "@/components/AuthCard";
 import { Header } from "@/components/Header";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
-const CARD =
-  "rounded-[14px] border border-white/[0.07] bg-[#12121C] p-4 text-left transition hover:bg-white/[0.04]";
+const MotionLink = motion.create(Link);
 
-const SAMPLE_GOALS = [
-  "Launch KAI app in 90 days",
-  "Get first 10 paying users",
-  "Do daily check-ins without missing",
+const FOCUS_ITEMS = [
+  "Reach out to 2 potential users",
+  "Finalize onboarding UI",
 ] as const;
 
-const SAMPLE_PLAN = [
-  "Monday: Set up project and first screens",
-  "Tuesday-Wednesday: Build chat and API",
-  "Thursday: Test with 5 real people",
-  "Friday: Fix bugs and improve KAI responses",
-] as const;
-
-/** Demo: set to 0 to hide the blocked-teammates alert */
 const TEAMMATES_BLOCKED = 2;
-
-const MODES = [
-  {
-    href: "/chat?mode=checkin",
-    emoji: "☀️",
-    title: "Daily Check-in",
-    subtitle: "How's your day going?",
-  },
-  {
-    href: "/chat?mode=stuck",
-    emoji: "🧠",
-    title: "I'm Stuck",
-    subtitle: "Let's unblock you fast",
-  },
-  {
-    href: "/chat?mode=plan",
-    emoji: "🗺️",
-    title: "Review My Plan",
-    subtitle: "Critique your week",
-  },
-  {
-    key: "brainstorm",
-    emoji: "💡",
-    title: "Brainstorm",
-    subtitle: "Generate options fast",
-  },
-] as const;
 
 export default function Home() {
   const router = useRouter();
@@ -57,15 +22,18 @@ export default function Home() {
   const [name, setName] = useState<string | null>(null);
   const [brainstormOpen, setBrainstormOpen] = useState(false);
   const [brainstormTopic, setBrainstormTopic] = useState("");
+  const [step, setStep] = useState(1);
 
   useEffect(() => {
-    setMounted(true);
-    try {
-      const stored = localStorage.getItem("userName");
-      setName(stored?.trim() || null);
-    } catch {
-      setName(null);
-    }
+    queueMicrotask(() => {
+      setMounted(true);
+      try {
+        const stored = localStorage.getItem("userName");
+        setName(stored?.trim() || null);
+      } catch {
+        setName(null);
+      }
+    });
   }, []);
 
   const displayName =
@@ -86,119 +54,177 @@ export default function Home() {
 
   return (
     <div
-      className="flex min-h-screen flex-col bg-[#0D0D1A]"
+      className="flex min-h-screen flex-col bg-black"
       style={{ fontFamily: "var(--font-dm-sans), sans-serif" }}
     >
       <Header />
 
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-4">
-        <section className="mb-6">
-          <h1
-            className="text-2xl font-bold leading-tight text-white sm:text-[26px]"
-            style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
-            suppressHydrationWarning
-          >
-            Good morning, {displayName} 👋
-          </h1>
-          <p className="mt-1.5 text-[15px] text-[#9CA3AF]">
-            Entrepreneur · 5/7 day streak 🔥
-          </p>
-        </section>
-
+      <main className="mx-auto w-full max-w-lg flex-1 px-6 pb-10 pt-8">
         {TEAMMATES_BLOCKED > 0 && (
-          <Link
-            href="/board"
-            className={`${CARD} mb-6 flex items-start gap-3 border-red-500/60 bg-red-950/35 hover:bg-red-950/45`}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: [0.33, 1, 0.68, 1] }}
           >
-            <span className="text-xl" aria-hidden>
-              🚨
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-red-100">
-                {TEAMMATES_BLOCKED} teammates blocked right now
-              </p>
-              <p className="mt-0.5 text-xs text-red-200/80">Open team board →</p>
-            </div>
-          </Link>
+            <Link
+              href="/board"
+              className="kai-card kai-card-interactive mb-8 flex items-start gap-3 p-4 transition-colors hover:border-[rgba(201,168,76,0.22)]"
+            >
+              <span className="text-xl opacity-90" aria-hidden>
+                🚨
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-[#F5F0E8]">
+                  {TEAMMATES_BLOCKED} teammates blocked right now
+                </p>
+                <p className="mt-0.5 text-xs text-[#E8DCC8]/65">
+                  Open team board →
+                </p>
+              </div>
+            </Link>
+          </motion.div>
         )}
 
-        <div className="mb-8 grid grid-cols-2 gap-3">
-          {MODES.map((m) =>
-            "href" in m ? (
-              <Link key={m.title} href={m.href} className={`${CARD} block`}>
-                <span className="text-2xl">{m.emoji}</span>
-                <p
-                  className="mt-2 text-sm font-semibold text-white"
-                  style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: [0.33, 1, 0.68, 1] }}
+        >
+          <h1
+            className="kai-heading text-2xl font-semibold leading-tight tracking-[0.05em] sm:text-3xl"
+            suppressHydrationWarning
+          >
+            Good morning, {displayName}.
+          </h1>
+          <p className="mt-2 text-sm text-[#E8DCC8]">
+            Let&apos;s make today count.
+          </p>
+        </motion.div>
+
+        {step === 1 && (
+          <div className="mt-8 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              className="kai-btn-shimmer rounded-xl border border-[rgba(201,168,76,0.38)] bg-black px-8 py-3 text-sm font-medium text-[#F5F0E8]"
+            >
+              Continue
+            </button>
+          </div>
+        )}
+
+        {step === 3 && <AuthCard />}
+
+        {step >= 2 && (
+          <motion.section
+            className="kai-card mt-8 p-6"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.12, ease: [0.33, 1, 0.68, 1] }}
+          >
+            <h2 className="kai-heading mb-4 text-lg font-semibold tracking-[0.05em]">
+              Today&apos;s Focus
+            </h2>
+
+            <ul className="space-y-3 text-sm leading-relaxed text-[#E8DCC8]">
+              {FOCUS_ITEMS.map((line) => (
+                <li key={line} className="flex items-start gap-2">
+                  <span className="shrink-0 text-[#C9A84C]" aria-hidden>
+                    •
+                  </span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+
+            {step === 2 && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setStep(3)}
+                  className="kai-btn-shimmer rounded-xl border border-[rgba(201,168,76,0.38)] bg-black px-8 py-3 text-sm font-medium text-[#F5F0E8]"
                 >
-                  {m.title}
-                </p>
-                <p className="mt-1 text-xs leading-snug text-[#9CA3AF]">
-                  {m.subtitle}
-                </p>
-              </Link>
-            ) : (
-              <button
-                key={m.key}
+                  Continue
+                </button>
+              </div>
+            )}
+
+            {step >= 3 && (
+              <MotionLink
+                href="/chat?mode=checkin"
+                className="kai-btn kai-btn-shimmer relative mt-6 flex w-full items-center justify-center rounded-xl border border-[rgba(201,168,76,0.38)] bg-black py-3 text-[15px] font-medium text-[#F5F0E8]"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                transition={{ type: "spring", stiffness: 520, damping: 32 }}
+              >
+                Start Check-in
+              </MotionLink>
+            )}
+          </motion.section>
+        )}
+
+        {step >= 3 && (
+          <>
+            <motion.div
+              className="mt-10 grid grid-cols-2 gap-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.28, ease: [0.33, 1, 0.68, 1] }}
+            >
+              <MotionLink
+                href="/chat?mode=stuck"
+                className="kai-card kai-card-interactive block p-4 text-left"
+                whileHover={{ y: -3 }}
+                transition={{ type: "spring", stiffness: 400, damping: 28 }}
+              >
+                <h3 className="text-sm font-medium text-[#F5F0E8]">
+                  I&apos;m Stuck
+                </h3>
+                <p className="mt-1 text-xs text-[#E8DCC8]/80">Unblock fast</p>
+              </MotionLink>
+
+              <motion.button
                 type="button"
                 onClick={openBrainstorm}
-                className={`${CARD} w-full`}
+                className="kai-card kai-card-interactive w-full p-4 text-left"
+                whileHover={{ y: -3 }}
+                transition={{ type: "spring", stiffness: 400, damping: 28 }}
               >
-                <span className="text-2xl">{m.emoji}</span>
-                <p
-                  className="mt-2 text-sm font-semibold text-white"
-                  style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
-                >
-                  {m.title}
-                </p>
-                <p className="mt-1 text-left text-xs leading-snug text-[#9CA3AF]">
-                  {m.subtitle}
-                </p>
-              </button>
-            ),
-          )}
-        </div>
+                <h3 className="text-sm font-medium text-[#F5F0E8]">
+                  Brainstorm
+                </h3>
+                <p className="mt-1 text-xs text-[#E8DCC8]/80">Generate ideas</p>
+              </motion.button>
+            </motion.div>
 
-        <section className={`${CARD} mb-4`}>
-          <h2
-            className="mb-3 text-sm font-semibold text-white"
-            style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
-          >
-            Active Goals
-          </h2>
-          <ul className="space-y-3">
-            {SAMPLE_GOALS.map((g) => (
-              <li key={g} className="flex gap-3">
-                <span
-                  className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border border-[#7C3AED] bg-[#7C3AED]/15 text-[11px] text-[#7C3AED]"
-                  aria-hidden
-                >
-                  ✓
-                </span>
-                <span className="text-[15px] leading-snug text-white/90">{g}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className={`${CARD} border-l-[3px] border-l-[#7C3AED] pl-4`}>
-          <h2
-            className="mb-3 text-sm font-semibold text-white"
-            style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
-          >
-            This Week&apos;s Plan
-          </h2>
-          <ul className="space-y-2.5 text-[15px] leading-relaxed text-white/85">
-            {SAMPLE_PLAN.map((line) => (
-              <li key={line} className="flex gap-2">
-                <span className="text-[#7C3AED]" aria-hidden>
-                  ·
-                </span>
-                <span>{line}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
+            <motion.nav
+              className="mt-10 flex flex-wrap justify-center gap-x-8 gap-y-2 text-xs text-[#E8DCC8]/55"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.35, delay: 0.4 }}
+              aria-label="More actions"
+            >
+              <Link
+                href="/chat?mode=plan"
+                className="transition-colors hover:text-[#C9A84C]"
+              >
+                Review plan
+              </Link>
+              <Link
+                href="/dashboard"
+                className="transition-colors hover:text-[#C9A84C]"
+              >
+                Dashboard
+              </Link>
+              <Link
+                href="/board"
+                className="transition-colors hover:text-[#C9A84C]"
+              >
+                Team board
+              </Link>
+            </motion.nav>
+          </>
+        )}
       </main>
 
       {brainstormOpen && (
@@ -210,19 +236,18 @@ export default function Home() {
         >
           <button
             type="button"
-            className="absolute inset-0 bg-black/60"
+            className="absolute inset-0 bg-black/75"
             aria-label="Close dialog"
             onClick={() => setBrainstormOpen(false)}
           />
-          <div className="relative z-10 w-full max-w-md rounded-[14px] border border-white/[0.07] bg-[#12121C] p-5 shadow-xl">
+          <div className="kai-card relative z-10 w-full max-w-md p-5">
             <h3
               id="brainstorm-title"
-              className="text-lg font-bold text-white"
-              style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
+              className="kai-heading text-lg font-semibold"
             >
               What do you want to brainstorm?
             </h3>
-            <p className="mt-1 text-sm text-[#9CA3AF]">
+            <p className="mt-1 text-sm text-[#E8DCC8]/75">
               Add a short topic — we&apos;ll open the chat with that context.
             </p>
             <form onSubmit={submitBrainstorm} className="mt-4 space-y-3">
@@ -231,21 +256,21 @@ export default function Home() {
                 value={brainstormTopic}
                 onChange={(e) => setBrainstormTopic(e.target.value)}
                 placeholder="e.g. Pricing strategy for KAI"
-                className="w-full rounded-xl border border-[#7C3AED]/50 bg-[#0D0D1A] px-4 py-3 text-[15px] text-white placeholder:text-white/35 focus:border-[#7C3AED] focus:outline-none focus:ring-1 focus:ring-[#7C3AED]/40"
+                className="w-full rounded-xl border border-[rgba(201,168,76,0.28)] bg-black px-4 py-3 text-[15px] text-[#F5F0E8] placeholder:text-[#E8DCC8]/35 focus:border-[rgba(201,168,76,0.5)] focus:outline-none focus:ring-2 focus:ring-[rgba(201,168,76,0.15)]"
                 autoFocus
               />
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setBrainstormOpen(false)}
-                  className="rounded-lg px-4 py-2 text-sm text-white/70 hover:text-white"
+                  className="rounded-lg px-4 py-2 text-sm text-[#E8DCC8]/70 hover:text-[#F5F0E8]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={!brainstormTopic.trim()}
-                  className="rounded-lg bg-[#7C3AED] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6d28d9] disabled:opacity-40"
+                  className="kai-btn-shimmer rounded-lg border border-[rgba(201,168,76,0.4)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] px-4 py-2 text-sm font-semibold text-black/90 hover:opacity-95 disabled:opacity-40"
                 >
                   Open chat
                 </button>

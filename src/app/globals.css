@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0d0d1a;
-  --foreground: #ffffff;
+  --kai-black: #000000;
+  --kai-gold: #c9a84c;
+  --kai-gold-gradient: linear-gradient(135deg, #c9a84c, #f5e6b3);
+  --kai-cream: #f5f0e8;
+  --kai-body: #e8dcc8;
+  --kai-card: #111111;
+  --kai-card-elevated: #1a1a1a;
+  --kai-border: rgba(201, 168, 76, 0.15);
+  --kai-glow: 0 0 20px rgba(201, 168, 76, 0.25);
+  --background: #000000;
+  --foreground: #f5f0e8;
 }
 
 @theme inline {
@@ -10,21 +19,172 @@
   --color-foreground: var(--foreground);
 }
 
+/* Pure black + faint radial gold (top-right) */
 body {
-  background-color: #0d0d1a;
-  color: #ffffff;
   min-height: 100vh;
+  background-color: var(--kai-black);
+  background-image: radial-gradient(
+    ellipse 75% 55% at 100% 0%,
+    rgba(201, 168, 76, 0.045) 0%,
+    transparent 58%
+  );
+  background-attachment: fixed;
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  color: var(--kai-body);
+}
+
+/* Headings — Playfair, cream */
+.kai-heading {
+  font-family: var(--font-playfair), "Georgia", serif;
+  letter-spacing: 0.05em;
+  color: #f5f0e8;
+}
+
+/* Cards — premium shell */
+.kai-card {
+  background: #111111;
+  border: 1px solid rgba(201, 168, 76, 0.15);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.kai-card-interactive:hover {
+  transform: translateY(-3px);
+  border-color: rgba(201, 168, 76, 0.28);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.68),
+    0 0 28px rgba(201, 168, 76, 0.1),
+    0 0 0 1px rgba(201, 168, 76, 0.18);
+}
+
+/* Active / selected glow */
+.kai-glow-active {
+  box-shadow: var(--kai-glow);
+}
+
+/* Icon tones */
+.kai-icon {
+  color: rgba(201, 168, 76, 0.7);
+  transition:
+    color 0.25s ease,
+    filter 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.kai-icon-active {
+  color: #c9a84c;
+  filter: drop-shadow(0 0 10px rgba(201, 168, 76, 0.35));
+}
+
+/* Buttons: black + gold border + shimmer */
+.kai-btn {
+  background: #000000;
+  border: 1px solid rgba(201, 168, 76, 0.35);
+  color: #f5f0e8;
+  transition:
+    border-color 0.25s ease,
+    background 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.kai-btn:hover {
+  border-color: rgba(201, 168, 76, 0.55);
+  box-shadow: 0 0 24px rgba(201, 168, 76, 0.12);
+}
+
+.kai-btn-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Gradient sweep left → right on hover (semi-transparent so label stays readable) */
+.kai-btn-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(201, 168, 76, 0) 35%,
+    rgba(245, 230, 200, 0.14) 48%,
+    rgba(201, 168, 76, 0.12) 52%,
+    rgba(245, 230, 200, 0.1) 56%,
+    transparent 100%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.38s cubic-bezier(0.33, 1, 0.68, 1);
+  pointer-events: none;
+}
+
+.kai-btn-shimmer:hover::after {
+  transform: translateX(120%);
+}
+
+/* Infinite horizontal sweep — use on an overlay (e.g. absolute inset-0 + gradient bg) */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.8s infinite;
+}
+
+/* Gold gradient text / fills */
+.kai-text-gold-gradient {
+  background: var(--kai-gold-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.kai-bg-gold-gradient {
+  background: var(--kai-gold-gradient);
 }
 
 @keyframes kai-message-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Route / page enter */
+@keyframes kai-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.kai-page-enter {
+  animation: kai-page-in 0.32s cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+/* Dashboard progress fill */
+.kai-progress-inner {
+  transition: width 0.48s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+/* Nav — active tab emphasis (used with Tailwind scale) */
+.kai-nav-active {
+  box-shadow: 0 0 22px rgba(201, 168, 76, 0.28);
 }
 
 @keyframes kai-typing-bounce {
@@ -41,7 +201,7 @@ body {
 }
 
 .kai-msg-animate {
-  animation: kai-message-in 0.4s ease-out forwards;
+  animation: kai-message-in 0.28s cubic-bezier(0.33, 1, 0.68, 1) forwards;
 }
 
 .kai-typing-dot {
@@ -56,4 +216,84 @@ body {
 }
 .kai-typing-dot:nth-child(3) {
   animation-delay: 0.3s;
+}
+
+/* Splash — 10px → 120px logo, soft gold glow pulse, tagline after 0.8s */
+@keyframes kai-splash-logo {
+  from {
+    transform: scale(calc(10 / 120));
+    opacity: 0.88;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes kai-splash-glow {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.36;
+  }
+}
+
+@keyframes kai-splash-tagline {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.kai-splash-logo {
+  display: inline-block;
+  transform-origin: center center;
+  animation: kai-splash-logo 1.2s ease-out forwards;
+}
+
+.kai-splash-glow {
+  animation: kai-splash-glow 2.8s ease-in-out infinite;
+}
+
+.kai-splash-tagline {
+  opacity: 0;
+  animation: kai-splash-tagline 0.6s ease-out 0.8s forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kai-page-enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .kai-msg-animate {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .kai-card-interactive:hover {
+    transform: none;
+  }
+
+  .kai-btn-shimmer::after {
+    transition: none;
+    transform: none;
+    opacity: 0;
+  }
+
+  .kai-progress-inner {
+    transition: none;
+  }
+
+  .animate-shimmer {
+    animation: none;
+  }
 }

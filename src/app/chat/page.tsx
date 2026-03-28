@@ -45,33 +45,30 @@ const BANNER: Record<
     emoji: "☀️",
     title: "Daily Check-in",
     barClass:
-      "border-[#7C3AED]/40 bg-[#7C3AED]/12 text-[#C4B5FD]",
+      "border-[rgba(201,168,76,0.2)] bg-[rgba(201,168,76,0.05)] text-[#F5F0E8]",
   },
   stuck: {
     emoji: "🧠",
     title: "I'm Stuck — Let's unblock you",
-    barClass: "border-pink-500/40 bg-pink-500/12 text-pink-200",
+    barClass:
+      "border-[rgba(201,168,76,0.18)] bg-[rgba(201,168,76,0.04)] text-[#F5F0E8]",
   },
   plan: {
     emoji: "🗺️",
     title: "Review My Plan",
-    barClass: "border-teal-500/40 bg-teal-500/12 text-teal-200",
+    barClass:
+      "border-[rgba(201,168,76,0.22)] bg-[rgba(201,168,76,0.06)] text-[#F5F0E8]",
   },
   ideas: {
     emoji: "💡",
     title: "Brainstorm Ideas",
-    barClass: "border-amber-500/40 bg-amber-500/12 text-amber-200",
+    barClass:
+      "border-[rgba(201,168,76,0.25)] bg-[rgba(201,168,76,0.07)] text-[#F5F0E8]",
   },
 };
 
-const INPUT_ACCENT: Record<ChatMode, string> = {
-  checkin:
-    "border-[#7C3AED]/70 focus:border-[#7C3AED] focus:ring-[#7C3AED]/35",
-  stuck: "border-pink-500/70 focus:border-pink-500 focus:ring-pink-500/35",
-  plan: "border-teal-500/70 focus:border-teal-500 focus:ring-teal-500/35",
-  ideas:
-    "border-amber-500/70 focus:border-amber-500 focus:ring-amber-500/35",
-};
+const INPUT_ACCENT =
+  "border-[rgba(201,168,76,0.28)] focus:border-[rgba(201,168,76,0.5)] focus:ring-2 focus:ring-[rgba(201,168,76,0.15)]";
 
 function parseMode(raw: string | null): ChatMode {
   const m = raw ?? "checkin";
@@ -98,12 +95,12 @@ function KaiBubble({ content }: { content: string }) {
   return (
     <div className="kai-msg-animate flex gap-3">
       <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#7C3AED] to-[#EC4899] text-base leading-none shadow-sm"
+        className="kai-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgba(201,168,76,0.15)] bg-[#111111] text-base leading-none shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
         aria-hidden
       >
         ⚡
       </div>
-      <div className="max-w-[85%] rounded-2xl rounded-tl-sm border border-white/[0.06] bg-white/[0.04] px-4 py-3 text-[15px] leading-relaxed text-white/95">
+      <div className="max-w-[85%] rounded-2xl rounded-tl-sm border border-[rgba(201,168,76,0.15)] border-l-[3px] border-l-[#C9A84C] bg-[#111111] px-4 py-3 text-[15px] leading-relaxed text-[#E8DCC8] shadow-[0_10px_30px_rgba(0,0,0,0.6)]">
         {content}
       </div>
     </div>
@@ -113,7 +110,7 @@ function KaiBubble({ content }: { content: string }) {
 function UserBubble({ content }: { content: string }) {
   return (
     <div className="kai-msg-animate flex justify-end">
-      <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-[#7C3AED] px-4 py-3 text-[15px] leading-relaxed text-white">
+      <div className="max-w-[85%] rounded-2xl rounded-tr-sm border border-[rgba(201,168,76,0.25)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] px-4 py-3 text-[15px] leading-relaxed text-black/90">
         {content}
       </div>
     </div>
@@ -124,21 +121,20 @@ function TypingRow() {
   return (
     <div className="flex gap-3">
       <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#7C3AED] to-[#EC4899] text-base leading-none opacity-90"
+        className="kai-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgba(201,168,76,0.15)] bg-[#111111] text-base leading-none opacity-90"
         aria-hidden
       >
         ⚡
       </div>
-      <div className="flex items-center gap-1 rounded-2xl rounded-tl-sm border border-white/[0.06] bg-white/[0.04] px-4 py-3">
-        <span className="kai-typing-dot inline-block h-2 w-2 rounded-full bg-[#7C3AED]" />
-        <span className="kai-typing-dot inline-block h-2 w-2 rounded-full bg-[#7C3AED]" />
-        <span className="kai-typing-dot inline-block h-2 w-2 rounded-full bg-[#7C3AED]" />
+      <div className="flex items-center gap-1 rounded-2xl rounded-tl-sm border border-[rgba(201,168,76,0.15)] bg-[#111111] px-4 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.6)]">
+        <span className="kai-typing-dot inline-block h-2 w-2 rounded-full bg-[#C9A84C]" />
+        <span className="kai-typing-dot inline-block h-2 w-2 rounded-full bg-[#C9A84C]" />
+        <span className="kai-typing-dot inline-block h-2 w-2 rounded-full bg-[#C9A84C]" />
       </div>
     </div>
   );
 }
 
-/** Reveals assistant text in small chunks for a streaming feel */
 function StreamingKaiBubble({
   fullText,
   onComplete,
@@ -152,7 +148,8 @@ function StreamingKaiBubble({
 
   useEffect(() => {
     finished.current = false;
-    setCount(0);
+    const id = requestAnimationFrame(() => setCount(0));
+    return () => cancelAnimationFrame(id);
   }, [fullText]);
 
   useEffect(() => {
@@ -270,11 +267,10 @@ function ChatInner() {
   };
 
   const banner = BANNER[mode];
-  const inputAccent = INPUT_ACCENT[mode];
 
   return (
     <div
-      className="flex min-h-screen flex-col bg-[#0D0D1A]"
+      className="flex min-h-screen flex-col bg-black"
       style={{ fontFamily: "var(--font-dm-sans), sans-serif" }}
     >
       <div
@@ -283,7 +279,7 @@ function ChatInner() {
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <Link
             href="/"
-            className="shrink-0 rounded-lg px-2 py-1 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white"
+            className="shrink-0 rounded-lg px-2 py-1 text-sm font-medium text-[#E8DCC8]/85 transition hover:bg-white/5 hover:text-[#F5F0E8]"
           >
             ← Back
           </Link>
@@ -291,10 +287,7 @@ function ChatInner() {
             <span className="text-lg" aria-hidden>
               {banner.emoji}
             </span>
-            <span
-              className="truncate text-sm font-semibold sm:text-[15px]"
-              style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
-            >
+            <span className="kai-heading truncate text-sm font-semibold tracking-[0.05em] sm:text-[15px]">
               {banner.title}
             </span>
           </div>
@@ -327,7 +320,7 @@ function ChatInner() {
 
         <form
           onSubmit={handleSend}
-          className="shrink-0 border-t border-white/[0.06] bg-[#0D0D1A]/95 p-4 backdrop-blur-md"
+          className="shrink-0 border-t border-[rgba(201,168,76,0.12)] bg-black/95 p-4 backdrop-blur-md"
         >
           <div className="mx-auto flex max-w-lg gap-2">
             <input
@@ -336,13 +329,13 @@ function ChatInner() {
               onChange={(e) => setInput(e.target.value)}
               placeholder="Message KAI…"
               disabled={isAwaitingApi || streaming !== null}
-              className={`min-h-11 flex-1 rounded-xl border bg-[#12121C] px-4 py-2.5 text-[15px] text-white placeholder:text-white/35 focus:outline-none focus:ring-2 disabled:opacity-50 ${inputAccent}`}
+              className={`min-h-11 flex-1 rounded-xl border bg-[#111111] px-4 py-2.5 text-[15px] text-[#F5F0E8] placeholder:text-[#E8DCC8]/35 focus:outline-none disabled:opacity-50 ${INPUT_ACCENT}`}
               autoComplete="off"
             />
             <button
               type="submit"
               disabled={!input.trim() || isAwaitingApi || streaming !== null}
-              className="shrink-0 rounded-xl bg-[#7C3AED] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#6d28d9] disabled:opacity-40"
+              className="kai-btn-shimmer shrink-0 rounded-xl border border-[rgba(201,168,76,0.4)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] px-4 py-2.5 text-sm font-semibold text-black/90 hover:opacity-95 disabled:opacity-40"
             >
               Send
             </button>
@@ -357,7 +350,7 @@ export default function ChatPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#0D0D1A] text-white/50">
+        <div className="flex min-h-screen items-center justify-center bg-black text-[#E8DCC8]/50">
           Loading chat…
         </div>
       }

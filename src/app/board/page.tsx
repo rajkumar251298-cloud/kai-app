@@ -23,7 +23,8 @@ const TEAM: TeamMember[] = [
     firstName: "Alex",
     initials: "AR",
     role: "Engineer",
-    avatarClass: "bg-gradient-to-br from-violet-500 to-purple-600",
+    avatarClass:
+      "border border-[rgba(201,168,76,0.22)] bg-gradient-to-br from-[#1c1810] to-[#0d0d0d] text-[#C9A84C]",
     status: "checked_in",
     streak: 6,
     stuckDays: null,
@@ -35,7 +36,8 @@ const TEAM: TeamMember[] = [
     firstName: "Sam",
     initials: "SK",
     role: "Designer",
-    avatarClass: "bg-gradient-to-br from-fuchsia-500 to-pink-600",
+    avatarClass:
+      "border border-[rgba(201,168,76,0.22)] bg-gradient-to-br from-[#1c1810] to-[#0d0d0d] text-[#C9A84C]",
     status: "pending",
     streak: 3,
     stuckDays: 2,
@@ -48,7 +50,8 @@ const TEAM: TeamMember[] = [
     firstName: "Jordan",
     initials: "JM",
     role: "Engineer",
-    avatarClass: "bg-gradient-to-br from-blue-500 to-indigo-600",
+    avatarClass:
+      "border border-[rgba(201,168,76,0.22)] bg-gradient-to-br from-[#1c1810] to-[#0d0d0d] text-[#C9A84C]",
     status: "checked_in",
     streak: 7,
     stuckDays: null,
@@ -60,7 +63,8 @@ const TEAM: TeamMember[] = [
     firstName: "Morgan",
     initials: "ML",
     role: "Marketing",
-    avatarClass: "bg-gradient-to-br from-emerald-500 to-teal-600",
+    avatarClass:
+      "border border-[rgba(201,168,76,0.22)] bg-gradient-to-br from-[#1c1810] to-[#0d0d0d] text-[#C9A84C]",
     status: "checked_in",
     streak: 2,
     stuckDays: 1,
@@ -69,8 +73,7 @@ const TEAM: TeamMember[] = [
   },
 ];
 
-const CARD =
-  "rounded-[14px] border border-white/[0.07] bg-[#12121C] p-4";
+const CARD = "kai-card kai-card-interactive p-4";
 
 function Avatar({
   initials,
@@ -81,7 +84,7 @@ function Avatar({
 }) {
   return (
     <div
-      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white ${className}`}
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${className}`}
       aria-hidden
     >
       {initials}
@@ -93,35 +96,28 @@ export default function BoardPage() {
   const blocked = TEAM.filter((m) => m.stuckDays != null && m.stuckDays > 0);
 
   return (
-    <div
-      className="flex min-h-screen flex-col bg-[#0D0D1A]"
-      style={{ fontFamily: "var(--font-dm-sans), sans-serif" }}
-    >
+    <div className="flex min-h-screen flex-col bg-black">
       <Header />
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-4">
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-6">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <h1
-            className="text-xl font-bold text-white"
-            style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
-          >
+          <h1 className="kai-heading text-xl font-semibold tracking-[0.05em]">
             Team board
           </h1>
           <Link
             href="/"
-            className="shrink-0 text-sm font-medium text-[#7C3AED] hover:underline"
+            className="shrink-0 text-sm font-medium text-[#C9A84C]/90 hover:text-[#F5E6B3]"
           >
             Home
           </Link>
         </div>
 
-        {/* —— BLOCKED —— */}
         <section className="mb-10">
-          <h2 className="mb-3 text-sm font-bold tracking-wide text-red-400">
-            🚨 Blocked
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#E8DCC8]/55">
+            Blocked
           </h2>
 
           {blocked.length === 0 ? (
-            <p className="rounded-[14px] border border-white/[0.07] bg-[#12121C] px-4 py-6 text-center text-sm text-white/50">
+            <p className="kai-card p-6 text-center text-sm text-[#E8DCC8]/45">
               Nobody is blocked right now.
             </p>
           ) : (
@@ -129,28 +125,28 @@ export default function BoardPage() {
               {blocked.map((m) => (
                 <article
                   key={m.id}
-                  className="rounded-[14px] border border-red-500/45 bg-red-950/25 p-4"
+                  className="kai-card kai-card-interactive border border-[rgba(201,168,76,0.18)] bg-[#1A1A1A] p-4 shadow-[0_0_0_1px_rgba(201,168,76,0.06)]"
                 >
                   <div className="flex gap-3">
                     <Avatar initials={m.initials} className={m.avatarClass} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-white">{m.name}</p>
-                        <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-300">
+                        <p className="font-semibold text-[#F5F0E8]">{m.name}</p>
+                        <span className="rounded-full border border-[rgba(201,168,76,0.25)] bg-black/60 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#C9A84C]/90">
                           Stuck {m.stuckDays} days
                         </span>
                       </div>
-                      <p className="text-sm text-white/55">{m.role}</p>
+                      <p className="text-sm text-[#E8DCC8]/55">{m.role}</p>
                     </div>
                   </div>
 
-                  <div className="mt-3 border-l-2 border-red-400/70 bg-black/20 py-2 pl-3 text-[14px] leading-relaxed text-white/85">
+                  <div className="mt-3 border-l-2 border-[rgba(201,168,76,0.35)] bg-black/40 py-2 pl-3 text-[14px] leading-relaxed text-[#E8DCC8]">
                     {m.lastUpdate}
                   </div>
 
                   <Link
                     href="/chat?mode=stuck"
-                    className="mt-4 flex w-full items-center justify-center rounded-xl bg-[#7C3AED] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#6d28d9]"
+                    className="kai-btn kai-btn-shimmer kai-glow-active mt-4 flex w-full items-center justify-center rounded-xl border border-[rgba(201,168,76,0.35)] bg-black px-4 py-2.5 text-sm font-semibold text-[#F5F0E8]"
                   >
                     Help {m.firstName} get unstuck
                   </Link>
@@ -160,12 +156,8 @@ export default function BoardPage() {
           )}
         </section>
 
-        {/* —— ALL TEAM —— */}
         <section>
-          <h2
-            className="mb-3 text-sm font-bold tracking-wide text-white/90"
-            style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
-          >
+          <h2 className="kai-heading mb-3 text-sm font-semibold tracking-[0.05em]">
             All Team
           </h2>
           <ul className="space-y-3">
@@ -176,31 +168,31 @@ export default function BoardPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="font-semibold text-white">{m.name}</p>
-                        <p className="text-xs text-white/45">{m.role}</p>
+                        <p className="font-semibold text-[#F5F0E8]">{m.name}</p>
+                        <p className="text-xs text-[#E8DCC8]/45">{m.role}</p>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1">
                         {m.stuckDays != null && m.stuckDays > 0 && (
-                          <span className="rounded bg-red-500/25 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-300">
+                          <span className="rounded border border-[rgba(201,168,76,0.3)] bg-black/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#C9A84C]/90">
                             STUCK
                           </span>
                         )}
                       </div>
                     </div>
-                    <p className="mt-2 text-[13px] leading-snug text-white/50">
+                    <p className="mt-2 text-[13px] leading-snug text-[#E8DCC8]/55">
                       {m.lastUpdate}
                     </p>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       {m.status === "checked_in" ? (
-                        <span className="text-[13px] font-medium text-emerald-400">
-                          ✅ Checked in
+                        <span className="text-[13px] font-medium text-[#C9A84C]/85">
+                          ✓ Checked in
                         </span>
                       ) : (
-                        <span className="text-[13px] font-medium text-amber-400">
-                          ⏳ Pending
+                        <span className="text-[13px] font-medium text-[#E8DCC8]/55">
+                          ◷ Pending
                         </span>
                       )}
-                      <span className="text-[13px] text-white/40">
+                      <span className="text-[13px] text-[#E8DCC8]/35">
                         · {m.streak} day streak
                       </span>
                     </div>

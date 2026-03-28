@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
-import { DM_Sans, Space_Grotesk } from "next/font/google";
+import { DM_Sans, Playfair_Display } from "next/font/google";
+import { Suspense } from "react";
+import { AuthGate } from "@/components/AuthGate";
+import { SplashGate } from "@/components/SplashGate";
 import "./globals.css";
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
   subsets: ["latin"],
-  weight: ["700"],
+  weight: ["600", "700"],
 });
 
 const dmSans = DM_Sans({
@@ -26,10 +29,20 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} ${dmSans.variable} h-full antialiased`}
+      className={`${playfair.variable} ${dmSans.variable} h-full antialiased`}
     >
-      <body className="min-h-full" suppressHydrationWarning>
-        {children}
+      <body
+        className="min-h-full bg-black font-[family-name:var(--font-dm-sans)] text-[#E8DCC8] antialiased"
+        style={{ fontFamily: "var(--font-dm-sans), system-ui, sans-serif" }}
+        suppressHydrationWarning
+      >
+        <Suspense
+          fallback={<div className="min-h-screen bg-black" aria-hidden />}
+        >
+          <SplashGate>
+            <AuthGate>{children}</AuthGate>
+          </SplashGate>
+        </Suspense>
       </body>
     </html>
   );
