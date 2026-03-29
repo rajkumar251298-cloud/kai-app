@@ -25,6 +25,11 @@ import {
   stripKaiMachineLines,
 } from "@/lib/kaiMemory";
 import { todayKey, tryAwardDailyCheckin } from "@/lib/kaiPoints";
+import {
+  KAI_TEXTAREA_MAX_PX,
+  scrollInputIntoView,
+  useAutoGrowTextarea,
+} from "@/components/AutoGrowChatInput";
 import { HomeBackLink } from "@/components/HomeBackLink";
 import { useSearchParams } from "next/navigation";
 import {
@@ -53,11 +58,11 @@ const STORAGE_KEYS = {
 const OPENINGS: Record<ChatMode, string> = {
   checkin: "",
   stuck:
-    "Got it — you're blocked. Describe exactly what you're stuck on. The more specific, the faster we solve it.",
+    "I'm glad you're here. What's feeling stuck — in your own words?",
   plan:
-    "Let's review your week. What do you want me to focus on — gaps, risks, or priorities?",
+    "Let's look at your week together. What do you want to walk through first?",
   ideas:
-    "What do you want to brainstorm? Give me the topic and any constraints.",
+    "Love it — tell me what we're brainstorming and any constraints I should know.",
 };
 
 const BANNER: Record<
@@ -123,7 +128,7 @@ function KaiBubble({ content }: { content: string }) {
       >
         ⚡
       </div>
-      <div className="max-w-[85%] rounded-2xl rounded-tl-sm border border-[rgba(201,168,76,0.15)] border-l-[3px] border-l-[#C9A84C] bg-[#111111] px-4 py-3 text-[15px] leading-relaxed text-[#E8DCC8] shadow-[0_10px_30px_rgba(0,0,0,0.6)]">
+      <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-tl-sm border border-[rgba(201,168,76,0.15)] border-l-[3px] border-l-[#C9A84C] bg-[#111111] px-4 py-3 text-[15px] leading-relaxed text-[#E8DCC8] shadow-[0_10px_30px_rgba(0,0,0,0.6)]">
         {content}
       </div>
     </div>
@@ -213,6 +218,18 @@ function ChatInner() {
     return OPENINGS[mode];
   });
 
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const onTextareaInput = useAutoGrowTextarea();
+
+  const inputPlaceholder =
+    mode === "checkin"
+      ? "Tell me about your day..."
+      : mode === "stuck"
+        ? "What are you stuck on?"
+        : mode === "plan"
+          ? "Share your plan..."
+          : "What to brainstorm?";
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isAwaitingApi, setIsAwaitingApi] = useState(false);
@@ -234,7 +251,9 @@ function ChatInner() {
 
   useLayoutEffect(() => {
     if (mode === "ideas" && topic) {
-      setOpeningLine(`${OPENINGS.ideas}\n\n(Topic from home: ${topic})`);
+      setOpeningLine(
+        `${OPENINGS.ideas}\n\n(Topic from home: ${topic})`,
+      );
       return;
     }
     if (mode === "checkin") {
@@ -278,6 +297,13 @@ function ChatInner() {
     const nextThread = [...messages, userMsg];
     setMessages(nextThread);
     setInput("");
+    queueMicrotask(() => {
+      const el = inputRef.current;
+      if (el) {
+        el.style.height = "auto";
+        el.style.overflow = "hidden";
+      }
+    });
     setIsAwaitingApi(true);
 
     if (mode === "ideas" && typeof window !== "undefined") {
@@ -423,7 +449,7 @@ function ChatInner() {
                     recordDailyGoalProgress(g.id, n);
                     markProgressRatedToday(g.id);
                     setGoalRatingNote(
-                      "Got it. Progress updated. Keep moving. ⚡",
+                      "Noted — thanks for being honest. That counts. ⚡",
                     );
                     window.setTimeout(() => {
                       setShowGoalRating(false);
@@ -448,14 +474,24 @@ function ChatInner() {
           onSubmit={handleSend}
           className="shrink-0 border-t border-[rgba(201,168,76,0.12)] bg-black/95 p-4 backdrop-blur-md"
         >
-          <div className="mx-auto flex max-w-lg gap-2">
-            <input
-              type="text"
+          <div className="mx-auto flex max-w-lg items-end gap-2">
+            <textarea
+              ref={inputRef}
+              rows={1}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Message KAI…"
+              onInput={(e) => {
+                onTextareaInput(e);
+              }}
+              onFocus={() => scrollInputIntoView(inputRef)}
+              placeholder={inputPlaceholder}
               disabled={isAwaitingApi || streaming !== null}
-              className={`min-h-11 flex-1 rounded-xl border bg-[#111111] px-4 py-2.5 text-[15px] text-[#F5F0E8] placeholder:text-[#E8DCC8]/35 focus:outline-none disabled:opacity-50 ${INPUT_ACCENT}`}
+              style={{
+                resize: "none",
+                maxHeight: KAI_TEXTAREA_MAX_PX,
+                overflow: "hidden",
+              }}
+              className={`min-h-[44px] flex-1 rounded-xl border bg-[#111111] px-4 py-2.5 text-[15px] leading-relaxed text-[#F5F0E8] placeholder:text-[#E8DCC8]/35 focus:outline-none disabled:opacity-50 ${INPUT_ACCENT}`}
               autoComplete="off"
             />
             <button

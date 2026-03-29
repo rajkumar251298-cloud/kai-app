@@ -1,11 +1,17 @@
 import { readKaiMemory, type KaiMemory } from "@/lib/kaiMemory";
 import { todayKey } from "@/lib/kaiPoints";
+import { getWarmDailyCheckinOpening } from "@/lib/kaiCheckinOpenings";
 import {
   checkinDefaultOpening,
   todaysFocusTasksForPersona,
 } from "@/lib/kaiPersona";
 
 export const DEFAULT_CHECKIN_OPENING = checkinDefaultOpening();
+
+function displayNameForOpening(): string {
+  if (typeof window === "undefined") return "there";
+  return localStorage.getItem("userName")?.trim() || "there";
+}
 
 /** Unfinished commitment from a prior calendar day (or explicit not-done). */
 export function shouldBlockTodaysFocus(m: KaiMemory): boolean {
@@ -19,16 +25,17 @@ export function shouldBlockTodaysFocus(m: KaiMemory): boolean {
 
 /** First KAI line when opening Daily Check-in (client). */
 export function buildCheckinOpening(m: KaiMemory): string {
+  const name = displayNameForOpening();
   if (shouldBlockTodaysFocus(m) && m.lastTask) {
     if (m.lastCompleted === false) {
-      return `Yesterday you said you'd ${m.lastTask}. You didn't do it. What happened?`;
+      return `Hey ${name} — you were aiming to ${m.lastTask}. No judgement. How did it really go?`;
     }
-    return `You committed to "${m.lastTask}" and we never closed the loop. Did you do it? One honest answer.`;
+    return `${name}, we left "${m.lastTask}" open. Did you get to it? I'd love to hear either way.`;
   }
   if (m.lastTask && m.lastCompleted === true) {
-    return `You did what you said yesterday. Good. Now don't slow down. What's the ONE thing you finish today?`;
+    return `Love that you followed through on ${m.lastTask}. What's one thing that would make today feel like a win?`;
   }
-  return checkinDefaultOpening();
+  return getWarmDailyCheckinOpening();
 }
 
 export type TodaysFocusResult =
@@ -54,8 +61,8 @@ export function getTodaysFocus(goalRaw: string): TodaysFocusResult {
   if (shouldBlockTodaysFocus(m)) {
     return {
       blocked: true,
-      headline: "We're not moving forward until you finish yesterday.",
-      body: `You committed to: "${m.lastTask}". Close the loop — then we pick the next move.`,
+      headline: "Let's gently close the loop on yesterday first.",
+      body: `You were aiming for: "${m.lastTask}". No stress — when you're ready, tell KAI how it went, then we pick the next step together.`,
       yesterdayTask: m.lastTask ?? "",
     };
   }
@@ -64,8 +71,8 @@ export function getTodaysFocus(goalRaw: string): TodaysFocusResult {
     return {
       blocked: false,
       tasks: [
-        "Set your main goal in onboarding — one sentence you’re embarrassed not to hit.",
-        "Then hit Start Check-in. KAI will hold you to specifics.",
+        "Set your main goal in onboarding — one sentence that really matters to you.",
+        "Then open Daily Check-in. KAI will help you turn it into small, doable steps.",
       ],
     };
   }

@@ -5,7 +5,6 @@ import {
   KAI_LS_CHECK_IN_TIME,
   KAI_LS_USER_GOAL,
   KAI_LS_USER_NAME,
-  getStoredUserGoal,
 } from "@/lib/kaiLocalProfile";
 import { addUserGoal } from "@/lib/goalSystem";
 import {
@@ -14,13 +13,6 @@ import {
 } from "@/lib/kaiPersona";
 import Link from "next/link";
 import {
-  K_NOTIFY,
-  cancelScheduledNotifications,
-  requestNotificationPermission,
-  saveNotificationPermissionStatus,
-  scheduleNotifications,
-} from "@/lib/notifications";
-import {
   FormEvent,
   useCallback,
   useEffect,
@@ -28,6 +20,11 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  KAI_TEXTAREA_MAX_PX,
+  scrollInputIntoView,
+  useAutoGrowTextarea,
+} from "@/components/AutoGrowChatInput";
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -39,50 +36,91 @@ const STORAGE_KEYS = {
   blockerPattern: "blockerPattern",
 } as const;
 
-const INTRO_MESSAGES = [
-  "Hey. I'm KAI — your personal accountability coach.",
-  "I'm not here to just track your tasks. I'm here to make sure you actually become the person you're trying to be.",
-  "What's your name?",
-] as const;
-
-const MSG_5 =
-  "If 90 days from now things actually went right, what would be different in your life?";
+const INTRO_1 = "Hey! I'm KAI 👋";
+const INTRO_2 =
+  "I'm your personal accountability coach — think of me as that friend who actually checks in on you every day and genuinely cares whether you win.";
+const INTRO_3 = "Before we get started — what's your name?";
 
 const MSG_6 =
-  "When you've failed to follow through in the past, what usually got in the way? Be honest.";
+  "I love that. Here's what I want you to know — I'm not going to judge you, lecture you, or make you feel bad on hard days. I'm just going to show up every morning and ask how it's going. That's it. Simple. Now — if things actually went right over the next 90 days, what would be different in your life?";
 
-const MSG_7 = "What time do you want me to show up every day?";
+const MSG_7 =
+  "That's a real goal. I can work with that. One more thing — what usually gets in the way when you're trying to follow through? Be honest, no judgement.";
 
-const AGE_OPTIONS = [
-  { value: "student", emoji: "🎓", label: "Student (16-22)" },
-  { value: "early_career", emoji: "💼", label: "Early Career (22-30)" },
-  { value: "building", emoji: "🚀", label: "Building Something (any age)" },
-  { value: "senior", emoji: "👔", label: "Senior Professional (30+)" },
-] as const;
+const MSG_8 =
+  "Totally normal — almost everyone says something similar. The good news? That's exactly what I'm here for. What time works for your daily check-in? I'll show up right on time, every day.";
 
-const GOAL_TYPE_OPTIONS = [
-  { value: "study", emoji: "📚", label: "Study & Exam Goals" },
-  { value: "career", emoji: "💰", label: "Career & Business Growth" },
-  { value: "health", emoji: "🏋️", label: "Health & Personal Habits" },
-  { value: "startup", emoji: "🎯", label: "Side Project or Startup" },
-] as const;
-
-function msgAge(name: string) {
-  return `Quick one ${name} — which best describes where you are in life?`;
+function msg9(timeLabel: string, name: string) {
+  return `Perfect. I'll be here at ${timeLabel} every day.\n${name} — I want you to know something. Most people download apps like this and never really use them. I don't think you're most people — otherwise you wouldn't have made it this far.\nLet's show up for each other. Starting tomorrow morning. 😊⚡`;
 }
 
-const MSG_GOAL_TYPE =
-  "And what brings you here? What do you actually want to change?";
+type SelfId =
+  | "student"
+  | "professional"
+  | "builder"
+  | "health"
+  | "personal"
+  | "starting";
 
-const MSG_PRIMARY_GOAL = `Let's make this real. What is your #1 goal right now? The one thing that if you achieved it in the next 90 days would change everything?`;
+const SELF_OPTIONS: {
+  id: SelfId;
+  emoji: string;
+  label: string;
+  age: string;
+  goalType: string;
+}[] = [
+  {
+    id: "student",
+    emoji: "🎓",
+    label: "Student grinding for goals",
+    age: "student",
+    goalType: "study",
+  },
+  {
+    id: "professional",
+    emoji: "💼",
+    label: "Professional levelling up",
+    age: "early_career",
+    goalType: "career",
+  },
+  {
+    id: "builder",
+    emoji: "🚀",
+    label: "Building my own thing",
+    age: "building",
+    goalType: "startup",
+  },
+  {
+    id: "health",
+    emoji: "🏋️",
+    label: "Working on my health",
+    age: "early_career",
+    goalType: "health",
+  },
+  {
+    id: "personal",
+    emoji: "🎯",
+    label: "Chasing a big personal goal",
+    age: "early_career",
+    goalType: "career",
+  },
+  {
+    id: "starting",
+    emoji: "🌱",
+    label: "Just starting my journey",
+    age: "early_career",
+    goalType: "career",
+  },
+];
 
-const MSG_MILESTONES = `Good. Now break it down — what are 3 milestones that would tell you you're making progress toward that?`;
-
-const MSG_DEADLINE = `And when do you want to achieve this by?`;
-
-function msg8(timeLabel: string) {
-  return `Perfect. I'll be here at ${timeLabel}. Most people who use tools like this don't follow through. I don't think you're most people. See you tomorrow morning. Don't be late. 😏`;
-}
+const MSG_5_BY_SELF: Record<SelfId, string> = {
+  student: `A student with drive — I love that. The habits you build now will define your entire career. Let's make them count. What's the one goal that matters most to you right now — your studies, a skill, or something else?`,
+  professional: `A professional ready to level up — that takes guts. Most people just coast along. Not you. What's the one area you most want to grow in right now?`,
+  builder: `A builder! This is my favourite kind of person to coach. You're creating something from nothing — that takes real courage. What are you building? One sentence is enough.`,
+  health: `Health goals are the foundation of everything else. When you feel good, you do good. What does your health goal look like? More energy? Fitness? Better habits?`,
+  personal: `A big personal goal — now we're talking. These are the ones that actually change your life when you hit them. What's the goal? Don't hold back.`,
+  starting: `Everyone starts somewhere — and the fact that you're here means you're already ahead of most people. What made you decide to start today? What do you want to change?`,
+};
 
 type ChatRole = "kai" | "user";
 
@@ -95,28 +133,15 @@ type ChatMessage = {
 type Phase =
   | "intro"
   | "wait_name"
-  | "wait_age"
-  | "wait_goal_type"
-  | "wait_primary_goal"
-  | "wait_milestones"
-  | "wait_goal_deadline"
+  | "wait_self_pick"
+  | "wait_goal_text"
   | "wait_vision"
   | "wait_blocker"
   | "wait_time"
-  | "nudge_prompt"
-  | "ai_chat";
+  | "done";
 
 function newId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function toApiMessages(
-  list: ChatMessage[],
-): { role: "user" | "assistant"; content: string }[] {
-  return list.map((m) => ({
-    role: m.role === "kai" ? "assistant" : "user",
-    content: m.content,
-  }));
 }
 
 export default function OnboardingPage() {
@@ -124,14 +149,10 @@ export default function OnboardingPage() {
   const [phase, setPhase] = useState<Phase>("intro");
   const [isKaiTyping, setIsKaiTyping] = useState(true);
   const [input, setInput] = useState("");
-  const [otherTimeOpen, setOtherTimeOpen] = useState(false);
-  const [otherTimeDraft, setOtherTimeDraft] = useState("");
-  const [primaryGoalTitle, setPrimaryGoalTitle] = useState("");
-  const [ms1, setMs1] = useState("");
-  const [ms2, setMs2] = useState("");
-  const [ms3, setMs3] = useState("");
-  const [goalTargetDate, setGoalTargetDate] = useState("");
+  const [userFirstName, setUserFirstName] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const onTextareaInput = useAutoGrowTextarea();
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -145,21 +166,27 @@ export default function OnboardingPage() {
     let cancelled = false;
 
     async function runIntro() {
-      for (let i = 0; i < INTRO_MESSAGES.length; i++) {
-        setIsKaiTyping(true);
-        await delay(900);
-        if (cancelled) return;
-        setMessages((prev) => [
-          ...prev,
-          { id: newId(), role: "kai", content: INTRO_MESSAGES[i] },
-        ]);
-        setIsKaiTyping(false);
-      }
+      setIsKaiTyping(true);
+      await delay(300);
       if (cancelled) return;
+      setMessages([{ id: newId(), role: "kai", content: INTRO_1 }]);
+      setIsKaiTyping(false);
+      await delay(900);
+      if (cancelled) return;
+      setMessages((prev) => [
+        ...prev,
+        { id: newId(), role: "kai", content: INTRO_2 },
+      ]);
+      await delay(1200);
+      if (cancelled) return;
+      setMessages((prev) => [
+        ...prev,
+        { id: newId(), role: "kai", content: INTRO_3 },
+      ]);
       setPhase("wait_name");
     }
 
-    runIntro();
+    void runIntro();
     return () => {
       cancelled = true;
     };
@@ -167,7 +194,7 @@ export default function OnboardingPage() {
 
   const pushKai = useCallback(async (content: string) => {
     setIsKaiTyping(true);
-    await delay(900);
+    await delay(600);
     setMessages((prev) => [...prev, { id: newId(), role: "kai", content }]);
     setIsKaiTyping(false);
   }, []);
@@ -183,210 +210,126 @@ export default function OnboardingPage() {
 
     if (phase === "wait_name") {
       setInput("");
+      queueMicrotask(() => {
+        const el = textareaRef.current;
+        if (el) {
+          el.style.height = "auto";
+          el.style.overflow = "hidden";
+        }
+      });
       pushUser(text);
       if (typeof window !== "undefined") {
         localStorage.setItem(STORAGE_KEYS.userName, text);
       }
-      setPhase("wait_age");
-      await pushKai(msgAge(text));
+      setUserFirstName(text);
+      setPhase("wait_self_pick");
+      await pushKai(
+        `Love that name, ${text} 😊 Tell me about yourself in one line — what best describes you right now?`,
+      );
       return;
     }
 
-    if (phase === "wait_primary_goal") {
+    if (phase === "wait_goal_text") {
       setInput("");
       pushUser(text);
-      setPrimaryGoalTitle(text);
-      setPhase("wait_milestones");
-      await pushKai(MSG_MILESTONES);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(STORAGE_KEYS.userGoal, text);
+        localStorage.removeItem("mainGoal");
+        const d = new Date();
+        d.setDate(d.getDate() + 90);
+        const y = d.getFullYear();
+        const mo = String(d.getMonth() + 1).padStart(2, "0");
+        const da = String(d.getDate()).padStart(2, "0");
+        addUserGoal({
+          title: text,
+          targetDate: `${y}-${mo}-${da}`,
+          category: "work",
+          milestones: ["Checkpoint 1", "Checkpoint 2", "Checkpoint 3"],
+        });
+      }
+      setPhase("wait_vision");
+      await pushKai(MSG_6);
       return;
     }
 
     if (phase === "wait_vision") {
       setInput("");
+      queueMicrotask(() => {
+        const el = textareaRef.current;
+        if (el) {
+          el.style.height = "auto";
+          el.style.overflow = "hidden";
+        }
+      });
       pushUser(text);
       if (typeof window !== "undefined") {
         localStorage.setItem(STORAGE_KEYS.ninetyDayVision, text);
       }
       setPhase("wait_blocker");
-      await pushKai(MSG_6);
+      await pushKai(MSG_7);
       return;
     }
 
     if (phase === "wait_blocker") {
       setInput("");
+      queueMicrotask(() => {
+        const el = textareaRef.current;
+        if (el) {
+          el.style.height = "auto";
+          el.style.overflow = "hidden";
+        }
+      });
       pushUser(text);
       if (typeof window !== "undefined") {
         localStorage.setItem(STORAGE_KEYS.blockerPattern, text);
       }
-      await pushKai(MSG_7);
       setPhase("wait_time");
-      return;
-    }
-
-    if (phase === "ai_chat") {
-      const userMsg: ChatMessage = {
-        id: newId(),
-        role: "user",
-        content: text,
-      };
-      const nextMessages = [...messages, userMsg];
-      setInput("");
-      setMessages(nextMessages);
-      setIsKaiTyping(true);
-
-      const userName =
-        typeof window !== "undefined"
-          ? localStorage.getItem(STORAGE_KEYS.userName) ?? ""
-          : "";
-      const userGoal =
-        typeof window !== "undefined" ? getStoredUserGoal() : "";
-      const userAgeGroup =
-        typeof window !== "undefined"
-          ? localStorage.getItem(LS_USER_AGE_GROUP) ?? ""
-          : "";
-      const userGoalType =
-        typeof window !== "undefined"
-          ? localStorage.getItem(LS_USER_GOAL_TYPE) ?? ""
-          : "";
-
-      try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: toApiMessages(nextMessages),
-            userName,
-            userGoal,
-            chatMode: "checkin",
-            userAgeGroup,
-            userGoalType,
-          }),
-        });
-        const data: { reply?: string; error?: string } = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error ?? "Request failed");
-        }
-        const reply = data.reply?.trim();
-        if (!reply) {
-          throw new Error("Empty reply from assistant");
-        }
-        setMessages((prev) => [
-          ...prev,
-          { id: newId(), role: "kai", content: reply },
-        ]);
-      } catch (err) {
-        const msg =
-          err instanceof Error ? err.message : "Something went wrong.";
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: newId(),
-            role: "kai",
-            content: `Sorry — I couldn’t reach KAI right now. (${msg})`,
-          },
-        ]);
-      } finally {
-        setIsKaiTyping(false);
-      }
+      await pushKai(MSG_8);
       return;
     }
   };
 
   const finishWithTime = async (timeLabel: string) => {
-    if (isKaiTyping) return;
+    if (isKaiTyping || phase !== "wait_time") return;
     pushUser(timeLabel);
     if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEYS.checkInTime, timeLabel);
       localStorage.removeItem("checkinTime");
     }
-    setOtherTimeOpen(false);
-    await pushKai(msg8(timeLabel));
-    await pushKai(
-      "One last thing — can I nudge you when you go quiet? I promise I won't spam you. Just enough to keep you honest. 😏",
-    );
-    setPhase("nudge_prompt");
+    const name =
+      userFirstName.trim() ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem(STORAGE_KEYS.userName)?.trim() || "friend"
+        : "friend");
+    await pushKai(msg9(timeLabel, name));
+    setPhase("done");
   };
 
-  const handleTimePick = (label: string) => {
-    if (phase !== "wait_time" || isKaiTyping) return;
-    void finishWithTime(label);
-  };
-
-  const handleOtherTimeConfirm = () => {
-    const t = otherTimeDraft.trim();
-    if (!t || phase !== "wait_time" || isKaiTyping) return;
-    void finishWithTime(t);
-    setOtherTimeDraft("");
-  };
-
-  const pickAge = async (value: (typeof AGE_OPTIONS)[number]["value"]) => {
-    if (phase !== "wait_age" || isKaiTyping) return;
-    const label = AGE_OPTIONS.find((o) => o.value === value)?.label ?? value;
-    pushUser(label);
+  const pickSelf = async (opt: (typeof SELF_OPTIONS)[number]) => {
+    if (phase !== "wait_self_pick" || isKaiTyping) return;
+    pushUser(`${opt.emoji} ${opt.label}`);
     if (typeof window !== "undefined") {
-      localStorage.setItem(LS_USER_AGE_GROUP, value);
+      localStorage.setItem(LS_USER_AGE_GROUP, opt.age);
+      localStorage.setItem(LS_USER_GOAL_TYPE, opt.goalType);
     }
-    setPhase("wait_goal_type");
-    await pushKai(MSG_GOAL_TYPE);
-  };
-
-  const pickGoalType = async (
-    value: (typeof GOAL_TYPE_OPTIONS)[number]["value"],
-  ) => {
-    if (phase !== "wait_goal_type" || isKaiTyping) return;
-    const label =
-      GOAL_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? value;
-    pushUser(label);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(LS_USER_GOAL_TYPE, value);
-    }
-    setPhase("wait_primary_goal");
-    await pushKai(MSG_PRIMARY_GOAL);
-  };
-
-  const submitMilestones = async () => {
-    if (phase !== "wait_milestones" || isKaiTyping) return;
-    const a = ms1.trim();
-    const b = ms2.trim();
-    const c = ms3.trim();
-    if (!a || !b || !c) return;
-    pushUser(`${a} | ${b} | ${c}`);
-    const d = new Date();
-    d.setDate(d.getDate() + 90);
-    const y = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, "0");
-    const da = String(d.getDate()).padStart(2, "0");
-    setGoalTargetDate(`${y}-${mo}-${da}`);
-    setPhase("wait_goal_deadline");
-    await pushKai(MSG_DEADLINE);
-  };
-
-  const submitGoalDeadline = async () => {
-    if (phase !== "wait_goal_deadline" || isKaiTyping) return;
-    if (!goalTargetDate || !primaryGoalTitle.trim()) return;
-    pushUser(goalTargetDate);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEYS.userGoal, primaryGoalTitle.trim());
-      localStorage.removeItem("mainGoal");
-      addUserGoal({
-        title: primaryGoalTitle.trim(),
-        targetDate: goalTargetDate,
-        category: "work",
-        milestones: [ms1.trim(), ms2.trim(), ms3.trim()],
-      });
-    }
-    setPhase("wait_vision");
-    await pushKai(MSG_5);
+    setPhase("wait_goal_text");
+    await pushKai(MSG_5_BY_SELF[opt.id]);
   };
 
   const showTextInput =
     phase === "wait_name" ||
-    phase === "wait_primary_goal" ||
+    phase === "wait_goal_text" ||
     phase === "wait_vision" ||
-    phase === "wait_blocker" ||
-    phase === "ai_chat";
+    phase === "wait_blocker";
 
-  const timeOptions = ["6am", "7am", "8am", "9am", "Other"] as const;
+  const timeOptions = [
+    "6am",
+    "7am",
+    "8am",
+    "9am",
+    "10am",
+    "Evening",
+  ] as const;
 
   return (
     <div
@@ -406,189 +349,45 @@ export default function OnboardingPage() {
 
           {isKaiTyping && <TypingRow />}
 
-          {phase === "wait_age" && !isKaiTyping && (
-            <div className="kai-msg-animate flex max-w-lg flex-col gap-2 pt-1 pl-[52px] pr-2">
-              {AGE_OPTIONS.map((o) => (
+          {phase === "wait_self_pick" && !isKaiTyping && (
+            <div className="kai-msg-animate grid max-w-lg grid-cols-2 gap-2 pt-1 pl-[52px] pr-2">
+              {SELF_OPTIONS.map((o) => (
                 <button
-                  key={o.value}
+                  key={o.id}
                   type="button"
-                  onClick={() => void pickAge(o.value)}
-                  className="kai-btn-shimmer rounded-xl border border-[rgba(201,168,76,0.35)] bg-black px-4 py-3 text-left text-sm font-medium text-[#E8DCC8] transition hover:border-[rgba(201,168,76,0.55)]"
+                  onClick={() => void pickSelf(o)}
+                  className="kai-btn-shimmer rounded-xl border border-[rgba(201,168,76,0.35)] bg-black px-3 py-3 text-left text-sm font-medium leading-snug text-[#E8DCC8] transition hover:border-[rgba(201,168,76,0.55)]"
                 >
                   {o.emoji} {o.label}
                 </button>
               ))}
-            </div>
-          )}
-
-          {phase === "wait_goal_type" && !isKaiTyping && (
-            <div className="kai-msg-animate flex max-w-lg flex-col gap-2 pt-1 pl-[52px] pr-2">
-              {GOAL_TYPE_OPTIONS.map((o) => (
-                <button
-                  key={o.value}
-                  type="button"
-                  onClick={() => void pickGoalType(o.value)}
-                  className="kai-btn-shimmer rounded-xl border border-[rgba(201,168,76,0.35)] bg-black px-4 py-3 text-left text-sm font-medium text-[#E8DCC8] transition hover:border-[rgba(201,168,76,0.55)]"
-                >
-                  {o.emoji} {o.label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {phase === "wait_milestones" && !isKaiTyping && (
-            <div className="kai-msg-animate max-w-lg space-y-3 pt-1 pl-[52px] pr-2">
-              <input
-                value={ms1}
-                onChange={(e) => setMs1(e.target.value)}
-                placeholder="Milestone 1"
-                className="w-full rounded-xl border border-[rgba(201,168,76,0.28)] bg-black px-4 py-2.5 text-sm text-[#F5F0E8]"
-              />
-              <input
-                value={ms2}
-                onChange={(e) => setMs2(e.target.value)}
-                placeholder="Milestone 2"
-                className="w-full rounded-xl border border-[rgba(201,168,76,0.28)] bg-black px-4 py-2.5 text-sm text-[#F5F0E8]"
-              />
-              <input
-                value={ms3}
-                onChange={(e) => setMs3(e.target.value)}
-                placeholder="Milestone 3"
-                className="w-full rounded-xl border border-[rgba(201,168,76,0.28)] bg-black px-4 py-2.5 text-sm text-[#F5F0E8]"
-              />
-              <button
-                type="button"
-                onClick={() => void submitMilestones()}
-                disabled={!ms1.trim() || !ms2.trim() || !ms3.trim()}
-                className="kai-btn-shimmer w-full rounded-xl border border-[rgba(201,168,76,0.45)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] py-3 text-sm font-semibold text-black/90 disabled:opacity-40"
-              >
-                Continue
-              </button>
-            </div>
-          )}
-
-          {phase === "wait_goal_deadline" && !isKaiTyping && (
-            <div className="kai-msg-animate max-w-lg space-y-3 pt-1 pl-[52px] pr-2">
-              <label className="block text-sm text-[#E8DCC8]/75">
-                Target date
-                <input
-                  type="date"
-                  value={goalTargetDate}
-                  onChange={(e) => setGoalTargetDate(e.target.value)}
-                  className="mt-2 w-full rounded-xl border border-[rgba(201,168,76,0.28)] bg-black px-4 py-2.5 text-sm text-[#F5F0E8]"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => void submitGoalDeadline()}
-                disabled={!goalTargetDate}
-                className="kai-btn-shimmer w-full rounded-xl border border-[rgba(201,168,76,0.45)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] py-3 text-sm font-semibold text-black/90 disabled:opacity-40"
-              >
-                Save goal
-              </button>
             </div>
           )}
 
           {phase === "wait_time" && !isKaiTyping && (
             <div className="kai-msg-animate pt-1 pl-[52px]">
-              {!otherTimeOpen ? (
-                <div className="flex max-w-full flex-wrap gap-2">
-                  {timeOptions.map((opt) =>
-                    opt === "Other" ? (
-                      <button
-                        key={opt}
-                        type="button"
-                        onClick={() => setOtherTimeOpen(true)}
-                        className="kai-btn-shimmer rounded-full border border-[rgba(201,168,76,0.35)] bg-black px-4 py-2.5 text-sm font-medium text-[#C9A84C] transition hover:border-[rgba(201,168,76,0.55)] hover:bg-[#111111]"
-                      >
-                        Other
-                      </button>
-                    ) : (
-                      <button
-                        key={opt}
-                        type="button"
-                        onClick={() => handleTimePick(opt)}
-                        className="kai-btn-shimmer rounded-full border border-[rgba(201,168,76,0.35)] bg-black px-4 py-2.5 text-sm font-medium text-[#C9A84C] transition hover:border-[rgba(201,168,76,0.55)] hover:bg-[#111111]"
-                      >
-                        {opt}
-                      </button>
-                    ),
-                  )}
-                </div>
-              ) : (
-                <div className="kai-card flex max-w-sm flex-col gap-2 p-3">
-                  <input
-                    type="text"
-                    value={otherTimeDraft}
-                    onChange={(e) => setOtherTimeDraft(e.target.value)}
-                    placeholder="What time works for you?"
-                    className="w-full rounded-lg border border-[rgba(201,168,76,0.2)] bg-black px-3 py-2 text-sm text-[#E8DCC8] placeholder:text-[#E8DCC8]/35 focus:border-[rgba(201,168,76,0.5)] focus:outline-none focus:ring-2 focus:ring-[rgba(201,168,76,0.12)]"
-                    autoFocus
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOtherTimeOpen(false);
-                        setOtherTimeDraft("");
-                      }}
-                      className="rounded-lg px-3 py-1.5 text-sm text-[#E8DCC8]/55 hover:text-[#F5F0E8]"
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleOtherTimeConfirm}
-                      className="kai-btn-shimmer ml-auto rounded-lg border border-[rgba(201,168,76,0.4)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] px-4 py-1.5 text-sm font-medium text-black/90 hover:opacity-95"
-                    >
-                      Confirm
-                    </button>
-                  </div>
-                </div>
-              )}
+              <div className="flex max-w-full flex-wrap gap-2">
+                {timeOptions.map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => void finishWithTime(opt)}
+                    className="kai-btn-shimmer rounded-full border border-[rgba(201,168,76,0.35)] bg-black px-4 py-2.5 text-sm font-medium text-[#C9A84C] transition hover:border-[rgba(201,168,76,0.55)] hover:bg-[#111111]"
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
-          {phase === "nudge_prompt" && !isKaiTyping && (
-            <div className="kai-msg-animate flex max-w-md flex-col gap-3 pt-2 pl-[52px] pr-4">
-              <button
-                type="button"
-                onClick={async () => {
-                  const p = await requestNotificationPermission();
-                  saveNotificationPermissionStatus();
-                  if (p === "granted") {
-                    localStorage.setItem(K_NOTIFY, "1");
-                    scheduleNotifications();
-                  } else {
-                    localStorage.setItem(K_NOTIFY, "0");
-                  }
-                  setPhase("ai_chat");
-                }}
-                className="kai-btn-shimmer rounded-xl border border-[rgba(201,168,76,0.45)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] px-5 py-3 text-sm font-semibold text-black/90 hover:opacity-95"
-              >
-                Yes, keep me accountable
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  localStorage.setItem(K_NOTIFY, "0");
-                  cancelScheduledNotifications();
-                  setPhase("ai_chat");
-                }}
-                className="rounded-xl px-4 py-2.5 text-left text-sm text-[#E8DCC8]/55 transition hover:text-[#F5F0E8]"
-              >
-                No thanks
-              </button>
-            </div>
-          )}
-
-          {phase === "ai_chat" && (
+          {phase === "done" && (
             <div className="kai-msg-animate flex justify-center pt-4">
               <Link
                 href="/"
                 className="kai-btn-shimmer inline-flex items-center gap-2 rounded-full border border-[rgba(201,168,76,0.4)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] px-8 py-3 text-base font-semibold text-black/90 hover:opacity-95"
               >
-                Let&apos;s go →
+                I&apos;m ready →
               </Link>
             </div>
           )}
@@ -601,14 +400,24 @@ export default function OnboardingPage() {
             onSubmit={handleSend}
             className="shrink-0 border-t border-[rgba(201,168,76,0.12)] bg-black/95 p-4 backdrop-blur-md"
           >
-            <div className="mx-auto flex max-w-2xl gap-2">
-              <input
-                type="text"
+            <div className="mx-auto flex max-w-2xl items-end gap-2">
+              <textarea
+                ref={textareaRef}
+                rows={1}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Type a message…"
+                onInput={(e) => {
+                  onTextareaInput(e);
+                }}
+                onFocus={() => scrollInputIntoView(textareaRef)}
+                placeholder="Type your answer..."
                 disabled={isKaiTyping}
-                className="min-h-11 flex-1 rounded-xl border border-[rgba(201,168,76,0.28)] bg-[#111111] px-4 py-2.5 text-[15px] text-[#F5F0E8] placeholder:text-[#E8DCC8]/35 focus:border-[rgba(201,168,76,0.5)] focus:outline-none focus:ring-2 focus:ring-[rgba(201,168,76,0.15)] disabled:opacity-50"
+                style={{
+                  resize: "none",
+                  maxHeight: KAI_TEXTAREA_MAX_PX,
+                  overflow: "hidden",
+                }}
+                className="min-h-[44px] flex-1 rounded-xl border border-[rgba(201,168,76,0.28)] bg-[#111111] px-4 py-2.5 text-[15px] leading-relaxed text-[#F5F0E8] placeholder:text-[#E8DCC8]/35 focus:border-[rgba(201,168,76,0.5)] focus:outline-none focus:ring-2 focus:ring-[rgba(201,168,76,0.15)] disabled:opacity-50"
                 autoComplete="off"
               />
               <button
@@ -635,7 +444,7 @@ function KaiBubble({ content }: { content: string }) {
       >
         ⚡
       </div>
-      <div className="max-w-[85%] rounded-2xl rounded-tl-sm border border-[rgba(201,168,76,0.15)] border-l-[3px] border-l-[#C9A84C] bg-[#111111] px-4 py-3 text-[15px] leading-relaxed text-[#E8DCC8] shadow-[0_10px_30px_rgba(0,0,0,0.6)]">
+      <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-tl-sm border border-[rgba(201,168,76,0.15)] border-l-[3px] border-l-[#C9A84C] bg-[#111111] px-4 py-3 text-[15px] leading-relaxed text-[#E8DCC8] shadow-[0_10px_30px_rgba(0,0,0,0.6)]">
         {content}
       </div>
     </div>

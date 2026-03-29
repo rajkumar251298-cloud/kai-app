@@ -112,43 +112,33 @@ export function checkinDefaultOpening(): string {
   const age = readUserAgeGroup();
   const gt = readUserGoalType();
   if (age === "student" && gt === "study") {
-    return "What subject or topic are you studying today? And be specific — not 'studying' but which chapter, which concept.";
+    return "What are you studying today — which chapter or topic feels most important to touch?";
   }
   if (age === "early_career" && gt === "career") {
-    return "What's the one work task today that will actually move your career forward? Not the busywork — the real thing.";
+    return "What's one work thing today that would genuinely move you forward — even a small step counts?";
   }
   if (age === "building" && gt === "startup") {
-    return "What did you ship yesterday? And what's shipping today?";
+    return "What did you get done last time we talked — and what's one small thing you'd love to ship today?";
   }
   if (age === "senior") {
-    return "What is the highest leverage thing you can do today — the thing only you can do?";
+    return "What's one high-leverage thing you could do today — the kind only you can do?";
   }
   if (gt === "study") {
-    return "What subject or topic are you studying today? Be specific — chapter and concept.";
+    return "What are you studying today — which chapter or topic is on your mind?";
   }
   if (gt === "career") {
-    return "What's the one work task today that actually moves your career forward?";
+    return "What's one work win you could aim for today — even a modest one?";
   }
   if (gt === "startup") {
-    return "What did you ship yesterday — and what's shipping today?";
+    return "What's one small thing you could ship or move forward today?";
   }
-  return "What's the one thing you finish today that actually moves the needle? Not 'work on' — name the output.";
+  return "What's one thing that would make today feel like progress for you?";
 }
 
 export function stuckOpeningForPersona(): string {
-  const age = readUserAgeGroup();
-  const gt = readUserGoalType();
-  if (age === "student" || gt === "study") {
-    return "You're stuck — is it exam anxiety, not knowing where to start, or procrastination? Say which, then name the smallest next step.";
+  if (typeof window === "undefined") {
+    return "I'm glad you're here. What's feeling stuck — in your own words?";
   }
-  if (age === "early_career" || gt === "career") {
-    return "You're stuck at work — office politics, a skill gap, or a hard conversation (like salary)? Name the real blocker in one line.";
-  }
-  if (age === "building" || gt === "startup") {
-    return "Founder mode: are you stuck on product, finding users, or fundraising? Pick one — we'll unstick it fast.";
-  }
-  if (age === "senior") {
-    return "Leadership crunch: team, strategy, or burnout? Which is eating you right now — be blunt.";
-  }
-  return "Got it — you're blocked. Describe exactly what you're stuck on. The more specific, the faster we solve it.";
+  const name = localStorage.getItem("userName")?.trim() || "there";
+  return `${name}, I'm really glad you came here. What's feeling stuck right now — in plain words?`;
 }
