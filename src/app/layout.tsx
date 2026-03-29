@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { DM_Sans, Playfair_Display } from "next/font/google";
 import { Suspense } from "react";
+import { AppChrome } from "@/components/AppChrome";
 import { AuthGate } from "@/components/AuthGate";
+import { AuthProvider } from "@/components/AuthProvider";
 import { SplashGate } from "@/components/SplashGate";
 import "./globals.css";
 
@@ -40,7 +42,11 @@ export default function RootLayout({
           fallback={<div className="min-h-screen bg-black" aria-hidden />}
         >
           <SplashGate>
-            <AuthGate>{children}</AuthGate>
+            <AuthProvider>
+              <AuthGate>
+                <AppChrome>{children}</AppChrome>
+              </AuthGate>
+            </AuthProvider>
           </SplashGate>
         </Suspense>
       </body>

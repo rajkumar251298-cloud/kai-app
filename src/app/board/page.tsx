@@ -1,4 +1,5 @@
 import { Header } from "@/components/Header";
+import { HomeBackLink } from "@/components/HomeBackLink";
 import Link from "next/link";
 
 type CheckInStatus = "checked_in" | "pending";
@@ -98,18 +99,11 @@ export default function BoardPage() {
   return (
     <div className="flex min-h-screen flex-col bg-black">
       <Header />
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-6">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <h1 className="kai-heading text-xl font-semibold tracking-[0.05em]">
-            Team board
-          </h1>
-          <Link
-            href="/"
-            className="shrink-0 text-sm font-medium text-[#C9A84C]/90 hover:text-[#F5E6B3]"
-          >
-            Home
-          </Link>
-        </div>
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-6 max-md:pb-[calc(80px+env(safe-area-inset-bottom,0px))] max-md:text-[15px]">
+        <HomeBackLink />
+        <h1 className="kai-heading mb-2 text-xl font-semibold tracking-[0.05em]">
+          Team board
+        </h1>
 
         <section className="mb-10">
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#E8DCC8]/55">

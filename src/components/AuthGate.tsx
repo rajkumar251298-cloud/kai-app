@@ -1,22 +1,26 @@
 "use client";
 
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/components/AuthProvider";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 
-/**
- * Routes that do not require a Supabase session.
- * Core screens use localStorage + optional sign-in; only redirect to onboarding
- * when we add stricter protected routes later.
- */
 function isPublicPath(pathname: string) {
   if (pathname === "/") return true;
   if (pathname === "/splash" || pathname.startsWith("/splash/")) return true;
   if (pathname === "/onboarding" || pathname.startsWith("/onboarding/"))
     return true;
-  if (pathname === "/board" || pathname.startsWith("/board/")) return true;
-  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/"))
+  if (pathname === "/login" || pathname.startsWith("/login/")) return true;
+  if (pathname === "/auth/callback" || pathname.startsWith("/auth/callback/"))
     return true;
+  if (pathname === "/board" || pathname.startsWith("/board/")) return true;
+  if (pathname === "/profile" || pathname.startsWith("/profile/")) return true;
+  if (pathname === "/privacy" || pathname.startsWith("/privacy/")) return true;
+  if (pathname === "/terms" || pathname.startsWith("/terms/")) return true;
+  return false;
+}
+
+function requiresAuthSession(pathname: string) {
   if (pathname === "/chat" || pathname.startsWith("/chat/")) return true;
   return false;
 }
@@ -24,38 +28,51 @@ function isPublicPath(pathname: string) {
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const { session, loading, isConfigured } = useAuth();
+  const redirected = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
+    redirected.current = false;
+  }, [pathname]);
 
-    async function checkUser() {
-      if (isPublicPath(pathname)) {
-        if (!cancelled) setLoading(false);
-        return;
-      }
-
-      const { data } = await supabase.auth.getUser();
-      if (cancelled) return;
-
-      if (!data.user) {
-        router.replace("/onboarding");
-      }
-      if (!cancelled) setLoading(false);
+  useEffect(() => {
+    if (!isConfigured) {
+      return;
     }
+    if (loading) return;
+    if (isPublicPath(pathname)) return;
+    if (!requiresAuthSession(pathname)) return;
+    if (session) return;
+    if (redirected.current) return;
+    redirected.current = true;
+    router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+  }, [isConfigured, loading, pathname, router, session]);
 
-    void checkUser();
-    return () => {
-      cancelled = true;
-    };
-  }, [pathname, router]);
+  const gateLoading =
+    isSupabaseConfigured && loading && requiresAuthSession(pathname);
 
-  if (loading) {
+  if (gateLoading) {
     return (
       <div
         className="min-h-screen bg-black"
         aria-busy="true"
         aria-label="Loading"
+      />
+    );
+  }
+
+  if (
+    isConfigured &&
+    !loading &&
+    requiresAuthSession(pathname) &&
+    !session &&
+    !isPublicPath(pathname)
+  ) {
+    return (
+      <div
+        className="min-h-screen bg-black"
+        aria-busy="true"
+        aria-label="Redirecting to sign in"
       />
     );
   }

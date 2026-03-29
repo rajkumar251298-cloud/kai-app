@@ -269,7 +269,7 @@ export default function OnboardingPage() {
 
   return (
     <div
-      className="flex min-h-screen flex-col bg-black"
+      className="flex min-h-screen flex-col bg-black max-md:pb-[calc(80px+env(safe-area-inset-bottom,0px))] max-md:text-[15px]"
       style={{ fontFamily: "var(--font-dm-sans), sans-serif" }}
     >
       <Header />

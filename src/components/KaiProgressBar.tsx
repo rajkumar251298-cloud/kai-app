@@ -25,7 +25,7 @@ export function KaiProgressBar({ pct, barClassName }: KaiProgressBarProps) {
   }, [pct]);
 
   return (
-    <div className="h-2.5 w-full overflow-hidden rounded-full bg-black">
+    <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
       <div
         className={`kai-progress-inner h-full rounded-full ${barClassName}`}
         style={{ width: `${width}%` }}

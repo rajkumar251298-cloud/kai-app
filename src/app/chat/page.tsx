@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { tryAwardDailyCheckin } from "@/lib/kaiPoints";
+import { HomeBackLink } from "@/components/HomeBackLink";
 import { useSearchParams } from "next/navigation";
 import {
   FormEvent,
@@ -146,11 +147,8 @@ function StreamingKaiBubble({
   const [count, setCount] = useState(0);
   const finished = useRef(false);
 
-  useEffect(() => {
-    finished.current = false;
-    const id = requestAnimationFrame(() => setCount(0));
-    return () => cancelAnimationFrame(id);
-  }, [fullText]);
+  // Reset is handled by remounting when `fullText` changes (see key on parent).
+  // Avoids a race between async setCount(0) and the typing effect.
 
   useEffect(() => {
     if (tokens.length === 0) {
@@ -252,6 +250,9 @@ function ChatInner() {
       }
       setIsAwaitingApi(false);
       setStreaming(reply);
+      if (mode === "checkin") {
+        tryAwardDailyCheckin();
+      }
     } catch (err) {
       setIsAwaitingApi(false);
       const msg = err instanceof Error ? err.message : "Error";
@@ -270,24 +271,19 @@ function ChatInner() {
 
   return (
     <div
-      className="flex min-h-screen flex-col bg-black"
+      className="flex min-h-screen flex-col bg-black max-md:pb-[calc(80px+env(safe-area-inset-bottom,0px))] max-md:text-[15px]"
       style={{ fontFamily: "var(--font-dm-sans), sans-serif" }}
     >
       <div
         className={`sticky top-0 z-20 border-b px-4 py-3 backdrop-blur-md ${banner.barClass} border`}
       >
-        <div className="mx-auto flex max-w-lg items-center gap-3">
-          <Link
-            href="/"
-            className="shrink-0 rounded-lg px-2 py-1 text-sm font-medium text-[#E8DCC8]/85 transition hover:bg-white/5 hover:text-[#F5F0E8]"
-          >
-            ← Back
-          </Link>
-          <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="mx-auto flex max-w-lg flex-col gap-1">
+          <HomeBackLink noMarginBottom />
+          <div className="flex min-w-0 items-center gap-2">
             <span className="text-lg" aria-hidden>
               {banner.emoji}
             </span>
-            <span className="kai-heading truncate text-sm font-semibold tracking-[0.05em] sm:text-[15px]">
+            <span className="kai-heading min-w-0 flex-1 truncate text-sm font-semibold tracking-[0.05em] sm:text-[15px]">
               {banner.title}
             </span>
           </div>
@@ -308,6 +304,7 @@ function ChatInner() {
 
           {streaming !== null && (
             <StreamingKaiBubble
+              key={streaming}
               fullText={streaming}
               onComplete={onStreamComplete}
             />

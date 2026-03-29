@@ -266,6 +266,38 @@ body {
   animation: kai-splash-tagline 0.6s ease-out 0.8s forwards;
 }
 
+@keyframes kai-letter-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-6px);
+  }
+  75% {
+    transform: translateX(6px);
+  }
+}
+
+.kai-letter-shake {
+  animation: kai-letter-shake 0.45s ease;
+}
+
+@keyframes kai-points-float {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-28px);
+  }
+}
+
+.kai-points-toast {
+  animation: kai-points-float 1.35s ease-out forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .kai-page-enter {
     animation: none;
@@ -295,5 +327,14 @@ body {
 
   .animate-shimmer {
     animation: none;
+  }
+
+  .kai-letter-shake {
+    animation: none;
+  }
+
+  .kai-points-toast {
+    animation: none;
+    opacity: 0;
   }
 }

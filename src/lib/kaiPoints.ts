@@ -1,0 +1,225 @@
+/** Streak points — localStorage (client-only). */
+
+export const KAI_POINTS_KEY = "kaiTotalPoints";
+export const KAI_HABIT_PROFILE_KEY = "habitProfile";
+export const KAI_HABIT_QUIZ_DONE_KEY = "kaiHabitQuizPointsAwarded";
+
+export function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function getTotalPoints(): number {
+  if (typeof window === "undefined") return 0;
+  const v = localStorage.getItem(KAI_POINTS_KEY);
+  return v ? parseInt(v, 10) || 0 : 0;
+}
+
+export function setTotalPoints(n: number): void {
+  localStorage.setItem(KAI_POINTS_KEY, String(Math.max(0, n)));
+}
+
+const KAI_CHECKIN_DATES_KEY = "kaiCheckinDates";
+const KAI_TOTAL_CHECKINS_KEY = "kaiTotalCheckins";
+const KAI_GAMES_PLAYED_KEY = "kaiGamesPlayedTotal";
+
+function pointsEarnedTodayKey(): string {
+  return `kaiPointsEarned_${todayKey()}`;
+}
+
+function addToPointsEarnedToday(amount: number): void {
+  if (typeof window === "undefined" || amount <= 0) return;
+  const key = pointsEarnedTodayKey();
+  const cur = parseInt(localStorage.getItem(key) || "0", 10);
+  localStorage.setItem(key, String(cur + amount));
+}
+
+export function getPointsEarnedToday(): number {
+  if (typeof window === "undefined") return 0;
+  return parseInt(localStorage.getItem(pointsEarnedTodayKey()) || "0", 10) || 0;
+}
+
+export function hasCheckinToday(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(`kaiDailyCheckin_${todayKey()}`) === "1";
+}
+
+function getCheckinDateSet(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const arr = JSON.parse(
+      localStorage.getItem(KAI_CHECKIN_DATES_KEY) || "[]",
+    ) as unknown;
+    if (!Array.isArray(arr)) return new Set();
+    return new Set(arr.filter((x): x is string => typeof x === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+function recordCheckinDate(t: string): void {
+  const set = getCheckinDateSet();
+  if (set.has(t)) return;
+  set.add(t);
+  const arr = [...set].sort();
+  localStorage.setItem(
+    KAI_CHECKIN_DATES_KEY,
+    JSON.stringify(arr.slice(-200)),
+  );
+}
+
+function bumpTotalCheckins(): void {
+  const n =
+    parseInt(localStorage.getItem(KAI_TOTAL_CHECKINS_KEY) || "0", 10) + 1;
+  localStorage.setItem(KAI_TOTAL_CHECKINS_KEY, String(n));
+}
+
+export function getTotalCheckins(): number {
+  if (typeof window === "undefined") return 0;
+  return parseInt(localStorage.getItem(KAI_TOTAL_CHECKINS_KEY) || "0", 10) || 0;
+}
+
+function bumpGamesPlayedCount(): void {
+  const n =
+    parseInt(localStorage.getItem(KAI_GAMES_PLAYED_KEY) || "0", 10) + 1;
+  localStorage.setItem(KAI_GAMES_PLAYED_KEY, String(n));
+}
+
+export function getGamesPlayedTotal(): number {
+  if (typeof window === "undefined") return 0;
+  return parseInt(localStorage.getItem(KAI_GAMES_PLAYED_KEY) || "0", 10) || 0;
+}
+
+function addUtcDays(isoDate: string, deltaDays: number): string {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, (m ?? 1) - 1, (d ?? 1) + deltaDays));
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Consecutive UTC calendar days with a recorded check-in, ending today. */
+export function getConsecutiveCheckinStreak(): number {
+  const set = getCheckinDateSet();
+  let key = todayKey();
+  let n = 0;
+  while (set.has(key)) {
+    n += 1;
+    key = addUtcDays(key, -1);
+  }
+  return n;
+}
+
+/** Seven dots: oldest → newest (rolling week ending today, UTC). */
+export function getLast7DaysCheckinFlags(): boolean[] {
+  const set = getCheckinDateSet();
+  const t = todayKey();
+  const out: boolean[] = [];
+  for (let i = 6; i >= 0; i -= 1) {
+    out.push(set.has(addUtcDays(t, -i)));
+  }
+  return out;
+}
+
+export function habitQuizProfileSaved(): boolean {
+  if (typeof window === "undefined") return false;
+  return Boolean(localStorage.getItem(KAI_HABIT_PROFILE_KEY)?.trim());
+}
+
+export function addPoints(amount: number): number {
+  const next = getTotalPoints() + amount;
+  setTotalPoints(next);
+  if (typeof window !== "undefined") {
+    if (amount > 0) addToPointsEarnedToday(amount);
+    window.dispatchEvent(
+      new CustomEvent("kai-points-earned", { detail: { amount } }),
+    );
+  }
+  return next;
+}
+
+export function wasWordSolvedToday(): boolean {
+  return localStorage.getItem(`kaiWordPuzzle_${todayKey()}`) === "1";
+}
+
+export function markWordSolvedToday(): void {
+  const k = `kaiWordPuzzle_${todayKey()}`;
+  const was = localStorage.getItem(k) === "1";
+  localStorage.setItem(k, "1");
+  if (!was) bumpGamesPlayedCount();
+}
+
+export function wasMemoryPlayedToday(): boolean {
+  return localStorage.getItem(`kaiMemoryGame_${todayKey()}`) === "1";
+}
+
+export function markMemoryPlayedToday(): void {
+  const k = `kaiMemoryGame_${todayKey()}`;
+  const was = localStorage.getItem(k) === "1";
+  localStorage.setItem(k, "1");
+  if (!was) bumpGamesPlayedCount();
+}
+
+export function wasLogicPlayedToday(): boolean {
+  return localStorage.getItem(`kaiLogicGame_${todayKey()}`) === "1";
+}
+
+export function markLogicPlayedToday(): void {
+  const k = `kaiLogicGame_${todayKey()}`;
+  const was = localStorage.getItem(k) === "1";
+  localStorage.setItem(k, "1");
+  if (!was) bumpGamesPlayedCount();
+}
+
+export function getMemoryBestMoves(): number | null {
+  const v = localStorage.getItem("kaiMemoryBestMoves");
+  if (!v) return null;
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+export function saveMemoryBestMoves(moves: number): void {
+  const cur = getMemoryBestMoves();
+  if (cur === null || moves < cur) {
+    localStorage.setItem("kaiMemoryBestMoves", String(moves));
+  }
+}
+
+function yesterdayKey(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/** +20 once per calendar day when daily check-in is marked complete (call from chat/home). */
+export function tryAwardDailyCheckin(): boolean {
+  const k = `kaiDailyCheckin_${todayKey()}`;
+  if (localStorage.getItem(k)) return false;
+  localStorage.setItem(k, "1");
+  recordCheckinDate(todayKey());
+  bumpTotalCheckins();
+  addPoints(20);
+  bumpCheckinStreak();
+  return true;
+}
+
+/** +100 every time a 7-day consecutive check-in streak completes. */
+function bumpCheckinStreak(): void {
+  const t = todayKey();
+  const last = localStorage.getItem("kaiLastCheckinDate");
+  const prevCount = parseInt(localStorage.getItem("kaiStreakCount") || "0", 10);
+  let next = 1;
+  if (last === yesterdayKey()) next = prevCount + 1;
+  else if (last === t) return;
+  localStorage.setItem("kaiLastCheckinDate", t);
+  if (next >= 7) {
+    addPoints(100);
+    next = 0;
+  }
+  localStorage.setItem("kaiStreakCount", String(next));
+}
+
+export function habitQuizPointsAlreadyAwarded(): boolean {
+  return localStorage.getItem(KAI_HABIT_QUIZ_DONE_KEY) === "1";
+}
+
+export function markHabitQuizPointsAwarded(): void {
+  localStorage.setItem(KAI_HABIT_QUIZ_DONE_KEY, "1");
+}
