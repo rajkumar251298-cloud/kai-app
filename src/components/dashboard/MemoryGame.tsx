@@ -1,20 +1,36 @@
 "use client";
 
+import { dayOfYearLocal } from "@/lib/dayOfYear";
 import {
   addPoints,
-  getMemoryBestMoves,
+  getMemoryBestForDate,
   markMemoryPlayedToday,
-  saveMemoryBestMoves,
+  saveMemoryBestForDate,
+  todayKey,
   wasMemoryPlayedToday,
 } from "@/lib/kaiPoints";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const EMOJIS = ["🎯", "💪", "🔥", "⚡", "🏆", "🧠", "💡", "✅"] as const;
+const EMOJI_SETS = [
+  { name: "Focus", emojis: ["🎯", "💪", "🔥", "⚡", "🏆", "🧠", "💡", "✅"] },
+  { name: "Nature", emojis: ["🌱", "🌊", "🦋", "🌸", "🍃", "⭐", "🌙", "☀️"] },
+  { name: "Sports", emojis: ["⚽", "🏀", "🎾", "🏋️", "🚴", "🏊", "🎯", "🥊"] },
+  { name: "Tech", emojis: ["💻", "📱", "⌨️", "🖥️", "🔋", "📡", "🔌", "💾"] },
+  { name: "Food", emojis: ["🍎", "🥑", "🍵", "🥗", "🍊", "🫐", "🥦", "🍋"] },
+  { name: "Travel", emojis: ["✈️", "🗺️", "🏔️", "🌍", "🧭", "⛵", "🚀", "🏕️"] },
+  { name: "Animals", emojis: ["🦁", "🐯", "🦊", "🐺", "🦅", "🐬", "🦋", "🐘"] },
+  { name: "Music", emojis: ["🎵", "🎸", "🎹", "🎺", "🎻", "🥁", "🎤", "🎧"] },
+  { name: "Weather", emojis: ["☀️", "🌤️", "⛅", "🌧️", "⚡", "❄️", "🌈", "🌪️"] },
+  {
+    name: "Emotions",
+    emojis: ["😊", "💪", "🔥", "✨", "🎉", "💫", "🌟", "❤️"],
+  },
+] as const;
 
 type Card = { id: number; emoji: string; pair: number };
 
-function buildDeck(): Card[] {
-  const pairs = EMOJIS.map((emoji, pair) => [
+function buildDeck(emojis: readonly string[]): Card[] {
+  const pairs = emojis.map((emoji, pair) => [
     { id: pair * 2, emoji, pair },
     { id: pair * 2 + 1, emoji, pair },
   ]).flat();
@@ -28,13 +44,21 @@ function buildDeck(): Card[] {
 type Props = { onPoints?: () => void };
 
 export function MemoryGame({ onPoints }: Props) {
-  const [deck] = useState(buildDeck);
+  const doy = dayOfYearLocal();
+  const setIndex = doy % EMOJI_SETS.length;
+  const theme = EMOJI_SETS[setIndex]!;
+  const deck = useMemo(
+    () => buildDeck([...theme.emojis]),
+    [theme.emojis],
+  );
+
+  const dateKey = todayKey();
   const [flipped, setFlipped] = useState<number[]>([]);
   const [matched, setMatched] = useState<Set<number>>(() => new Set());
   const [moves, setMoves] = useState(0);
   const [lock, setLock] = useState(false);
   const [done, setDone] = useState(false);
-  const [playedToday] = useState(() => wasMemoryPlayedToday());
+  const [playedToday, setPlayedToday] = useState(() => wasMemoryPlayedToday());
   const awardedRef = useRef(false);
 
   const resolvePair = useCallback((a: number, b: number) => {
@@ -79,16 +103,17 @@ export function MemoryGame({ onPoints }: Props) {
       if (awardedRef.current || playedToday) return;
       awardedRef.current = true;
       setDone(true);
-      saveMemoryBestMoves(moves);
+      saveMemoryBestForDate(dateKey, moves);
       if (!wasMemoryPlayedToday()) {
         markMemoryPlayedToday();
         addPoints(15);
         onPoints?.();
       }
+      setPlayedToday(true);
     });
-  }, [matched.size, moves, playedToday, onPoints]);
+  }, [matched.size, moves, playedToday, onPoints, dateKey]);
 
-  const best = getMemoryBestMoves();
+  const bestToday = getMemoryBestForDate(dateKey);
 
   return (
     <div className="kai-card mt-4 p-4">
@@ -98,9 +123,16 @@ export function MemoryGame({ onPoints }: Props) {
         </p>
         <span className="text-xs text-[#E8DCC8]/55">
           Moves: <span className="tabular-nums text-[#C9A84C]">{moves}</span>
-          {best !== null && <span className="ml-2">Best: {best}</span>}
         </span>
       </div>
+      <p className="mt-2 text-xs text-[#E8DCC8]/55">
+        Today&apos;s theme: {theme.name} · New theme tomorrow
+      </p>
+      {bestToday !== null && (
+        <p className="mt-1 text-xs text-[#C9A84C]/80">
+          Today&apos;s best: {bestToday} moves
+        </p>
+      )}
       <div className="mt-3 grid grid-cols-4 gap-2">
         {deck.map((c) => {
           const isUp = flipped.includes(c.id) || matched.has(c.pair);

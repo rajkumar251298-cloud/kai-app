@@ -1,27 +1,42 @@
 "use client";
 
-import { supabase } from "@/lib/supabase";
-import { FormEvent, useState } from "react";
+import { useAuth } from "@/components/AuthProvider";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { syncUserProfileToSupabase } from "@/lib/syncUserProfileToSupabase";
+import type { User } from "@supabase/supabase-js";
+import { FormEvent, useEffect, useState } from "react";
+
+async function saveUserToDB(user: User): Promise<void> {
+  await syncUserProfileToSupabase(user);
+}
 
 export default function AuthCard() {
+  const { user } = useAuth();
+
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "sent" | "error">(
     "idle",
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "";
+  useEffect(() => {
+    if (!isSupabaseConfigured || !user?.id) return;
+    void saveUserToDB(user);
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- sync once per auth user id
 
   const signInWithGoogle = async () => {
     setErrorMessage(null);
+    if (typeof window === "undefined") return;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: origin ? `${origin}/` : undefined,
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
-    if (error) setErrorMessage(error.message);
+    if (error) {
+      console.error(error);
+      setErrorMessage(error.message);
+    }
   };
 
   const signInWithEmail = async (raw: string) => {
@@ -33,7 +48,10 @@ export default function AuthCard() {
     const { error } = await supabase.auth.signInWithOtp({
       email: trimmed,
       options: {
-        emailRedirectTo: origin ? `${origin}/` : undefined,
+        emailRedirectTo:
+          typeof window !== "undefined"
+            ? `${window.location.origin}/auth/callback`
+            : undefined,
       },
     });
 

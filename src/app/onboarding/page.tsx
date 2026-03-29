@@ -1,7 +1,20 @@
 "use client";
 
 import { Header } from "@/components/Header";
+import {
+  KAI_LS_CHECK_IN_TIME,
+  KAI_LS_USER_GOAL,
+  KAI_LS_USER_NAME,
+  getStoredUserGoal,
+} from "@/lib/kaiLocalProfile";
 import Link from "next/link";
+import {
+  K_NOTIFY,
+  cancelScheduledNotifications,
+  requestNotificationPermission,
+  saveNotificationPermissionStatus,
+  scheduleNotifications,
+} from "@/lib/notifications";
 import {
   FormEvent,
   useCallback,
@@ -14,11 +27,11 @@ import {
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 const STORAGE_KEYS = {
-  userName: "userName",
-  mainGoal: "mainGoal",
+  userName: KAI_LS_USER_NAME,
+  userGoal: KAI_LS_USER_GOAL,
+  checkInTime: KAI_LS_CHECK_IN_TIME,
   ninetyDayVision: "ninetyDayVision",
   blockerPattern: "blockerPattern",
-  checkinTime: "checkinTime",
 } as const;
 
 const INTRO_MESSAGES = [
@@ -58,6 +71,7 @@ type Phase =
   | "wait_vision"
   | "wait_blocker"
   | "wait_time"
+  | "nudge_prompt"
   | "ai_chat";
 
 function newId() {
@@ -145,7 +159,8 @@ export default function OnboardingPage() {
       setInput("");
       pushUser(text);
       if (typeof window !== "undefined") {
-        localStorage.setItem(STORAGE_KEYS.mainGoal, text);
+        localStorage.setItem(STORAGE_KEYS.userGoal, text);
+        localStorage.removeItem("mainGoal");
       }
       setPhase("wait_vision");
       await pushKai(MSG_5);
@@ -190,9 +205,7 @@ export default function OnboardingPage() {
           ? localStorage.getItem(STORAGE_KEYS.userName) ?? ""
           : "";
       const userGoal =
-        typeof window !== "undefined"
-          ? localStorage.getItem(STORAGE_KEYS.mainGoal) ?? ""
-          : "";
+        typeof window !== "undefined" ? getStoredUserGoal() : "";
 
       try {
         const res = await fetch("/api/chat", {
@@ -239,11 +252,15 @@ export default function OnboardingPage() {
     if (isKaiTyping) return;
     pushUser(timeLabel);
     if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEYS.checkinTime, timeLabel);
+      localStorage.setItem(STORAGE_KEYS.checkInTime, timeLabel);
+      localStorage.removeItem("checkinTime");
     }
     setOtherTimeOpen(false);
     await pushKai(msg8(timeLabel));
-    setPhase("ai_chat");
+    await pushKai(
+      "One last thing — can I nudge you when you go quiet? I promise I won't spam you. Just enough to keep you honest. 😏",
+    );
+    setPhase("nudge_prompt");
   };
 
   const handleTimePick = (label: string) => {
@@ -342,6 +359,39 @@ export default function OnboardingPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {phase === "nudge_prompt" && !isKaiTyping && (
+            <div className="kai-msg-animate flex max-w-md flex-col gap-3 pt-2 pl-[52px] pr-4">
+              <button
+                type="button"
+                onClick={async () => {
+                  const p = await requestNotificationPermission();
+                  saveNotificationPermissionStatus();
+                  if (p === "granted") {
+                    localStorage.setItem(K_NOTIFY, "1");
+                    scheduleNotifications();
+                  } else {
+                    localStorage.setItem(K_NOTIFY, "0");
+                  }
+                  setPhase("ai_chat");
+                }}
+                className="kai-btn-shimmer rounded-xl border border-[rgba(201,168,76,0.45)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] px-5 py-3 text-sm font-semibold text-black/90 hover:opacity-95"
+              >
+                Yes, keep me accountable
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.setItem(K_NOTIFY, "0");
+                  cancelScheduledNotifications();
+                  setPhase("ai_chat");
+                }}
+                className="rounded-xl px-4 py-2.5 text-left text-sm text-[#E8DCC8]/55 transition hover:text-[#F5F0E8]"
+              >
+                No thanks
+              </button>
             </div>
           )}
 

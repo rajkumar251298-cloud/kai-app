@@ -1,12 +1,16 @@
 "use client";
 
+import { DAILY_REFLECTION_QUESTIONS } from "@/data/dailyReflection";
+import { dayOfYearLocal } from "@/lib/dayOfYear";
 import {
   addPoints,
   habitQuizPointsAlreadyAwarded,
   KAI_HABIT_PROFILE_KEY,
   markHabitQuizPointsAwarded,
+  todayKey,
+  tryAwardDailyReflectionPoints,
 } from "@/lib/kaiPoints";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Q = { id: string; text: string; options: string[] };
 
@@ -89,6 +93,62 @@ type Archetype = {
   body: string;
 };
 
+type SavedHabitProfile = {
+  type: string;
+  title: string;
+  body: string;
+  savedAt: string;
+  answers: number[];
+  insights: string[];
+};
+
+function reflectionStorageKey(): string {
+  return `kaiDailyReflection_${todayKey()}`;
+}
+
+function loadSavedProfile(): SavedHabitProfile | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(KAI_HABIT_PROFILE_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw) as Record<string, unknown>;
+    if (
+      typeof o.title !== "string" ||
+      typeof o.type !== "string" ||
+      typeof o.savedAt !== "string" ||
+      !Array.isArray(o.answers) ||
+      !Array.isArray(o.insights)
+    ) {
+      return null;
+    }
+    const body =
+      typeof o.body === "string"
+        ? o.body
+        : "KAI will tune coaching using your saved pattern.";
+    const savedAt =
+      typeof o.savedAt === "string"
+        ? o.savedAt
+        : new Date(0).toISOString();
+    return {
+      type: o.type,
+      title: o.title,
+      body,
+      savedAt,
+      answers: o.answers.filter((x): x is number => typeof x === "number"),
+      insights: o.insights.filter((x): x is string => typeof x === "string"),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function daysUntilRetakeAllowed(savedAtIso: string): number {
+  const t = new Date(savedAtIso).getTime();
+  if (!Number.isFinite(t)) return 0;
+  const elapsed = (Date.now() - t) / 86_400_000;
+  return Math.max(0, Math.ceil(30 - elapsed));
+}
+
 function detectArchetype(answers: number[]): Archetype {
   const q1 = answers[0];
   const q3 = answers[2];
@@ -141,15 +201,21 @@ function buildInsights(answers: number[], arch: Archetype): string[] {
   const i: string[] = [];
   const q3 = answers[2];
   if (q3 === 3)
-    i.push("Peak energy looks late — schedule deep work when you actually feel sharp.");
+    i.push(
+      "Peak energy looks late — schedule deep work when you actually feel sharp.",
+    );
   else if (q3 === 0)
     i.push("Early wins matter to you — protect the first 90 minutes of the day.");
   const q4 = answers[3];
   if (q4 === 1)
-    i.push("Writing goals down for 60 seconds can double follow-through — try it this week.");
+    i.push(
+      "Writing goals down for 60 seconds can double follow-through — try it this week.",
+    );
   const q7 = answers[6];
   if (q7 === 1)
-    i.push("When overwhelm hits, a 10-minute walk beats grinding — KAI will remind you.");
+    i.push(
+      "When overwhelm hits, a 10-minute walk beats grinding — KAI will remind you.",
+    );
   if (i.length < 3) {
     i.push(
       arch.key === "disciplined_driver"
@@ -163,15 +229,108 @@ function buildInsights(answers: number[], arch: Archetype): string[] {
   return i.slice(0, 3);
 }
 
+function DailyReflectionCard({ onPoints }: { onPoints?: () => void }) {
+  const qIndex = dayOfYearLocal() % DAILY_REFLECTION_QUESTIONS.length;
+  const q = DAILY_REFLECTION_QUESTIONS[qIndex]!;
+  const [saved, setSaved] = useState<{
+    opt: number;
+    kai: string;
+  } | null>(null);
+  const [pick, setPick] = useState<number | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(reflectionStorageKey());
+      if (!raw) return;
+      const o = JSON.parse(raw) as { qIndex?: number; optIndex?: number };
+      if (o.qIndex !== qIndex || typeof o.optIndex !== "number") return;
+      const kai = q.kaiByOption[o.optIndex] ?? "";
+      setSaved({ opt: o.optIndex, kai });
+    } catch {
+      /* ignore */
+    }
+  }, [q, qIndex]);
+
+  const submit = () => {
+    if (pick === null || saved) return;
+    const kai = q.kaiByOption[pick] ?? "";
+    localStorage.setItem(
+      reflectionStorageKey(),
+      JSON.stringify({
+        qIndex,
+        optIndex: pick,
+        at: new Date().toISOString(),
+      }),
+    );
+    tryAwardDailyReflectionPoints();
+    onPoints?.();
+    setSaved({ opt: pick, kai });
+  };
+
+  return (
+    <div className="kai-card border-2 border-[rgba(201,168,76,0.45)] p-5 shadow-[0_0_28px_rgba(201,168,76,0.12)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#C9A84C]">
+        Daily Reflection ⚡ +5 pts
+      </p>
+      <p className="mt-1 text-[11px] text-[#E8DCC8]/50">
+        Today&apos;s Reflection
+      </p>
+      <p className="mt-3 text-[15px] leading-snug text-[#F5F0E8]">{q.prompt}</p>
+      {saved ? (
+        <div className="mt-4 rounded-xl border border-[rgba(201,168,76,0.2)] bg-black/50 px-3 py-3 text-sm leading-relaxed text-[#E8DCC8]/88">
+          <p className="text-xs text-[#C9A84C]/85">You chose: {q.options[saved.opt]}</p>
+          <p className="mt-2">{saved.kai}</p>
+          <p className="mt-2 text-xs text-[#C9A84C]/90">+5 streak points logged today.</p>
+        </div>
+      ) : (
+        <>
+          <div className="mt-4 space-y-2">
+            {q.options.map((opt, i) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setPick(i)}
+                className={`kai-btn-shimmer w-full rounded-xl border px-4 py-3 text-left text-sm transition ${
+                  pick === i
+                    ? "border-[rgba(201,168,76,0.55)] bg-[rgba(201,168,76,0.1)] text-[#F5E6B3]"
+                    : "border-[rgba(201,168,76,0.25)] bg-black text-[#E8DCC8]"
+                }`}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={pick === null}
+            className="kai-btn-shimmer mt-4 w-full rounded-xl border border-[rgba(201,168,76,0.45)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] py-3 text-sm font-semibold text-black/90 disabled:opacity-40"
+          >
+            Save reflection
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 type Props = { onPoints?: () => void };
 
 export function HabitQuizTab({ onPoints }: Props) {
+  const [savedProfile, setSavedProfile] = useState<SavedHabitProfile | null>(
+    null,
+  );
+  const [retaking, setRetaking] = useState(false);
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState<number[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [done, setDone] = useState(false);
   const [saved, setSaved] = useState(false);
   const [quizPointsDone] = useState(() => habitQuizPointsAlreadyAwarded());
+
+  useEffect(() => {
+    setSavedProfile(loadSavedProfile());
+  }, []);
 
   const q = QUESTIONS[idx];
   const arch = useMemo(
@@ -182,6 +341,11 @@ export function HabitQuizTab({ onPoints }: Props) {
     () => (done && arch ? buildInsights(answers, arch) : []),
     [done, answers, arch],
   );
+
+  const retakeDaysLeft = savedProfile
+    ? daysUntilRetakeAllowed(savedProfile.savedAt)
+    : 0;
+  const canRetake = savedProfile !== null && retakeDaysLeft === 0;
 
   const pick = (optionIndex: number) => {
     setSelected(optionIndex);
@@ -209,9 +373,10 @@ export function HabitQuizTab({ onPoints }: Props) {
 
   const saveProfile = useCallback(() => {
     if (!arch) return;
-    const payload = {
+    const payload: SavedHabitProfile = {
       type: arch.key,
       title: arch.title,
+      body: arch.body,
       savedAt: new Date().toISOString(),
       answers,
       insights,
@@ -223,11 +388,69 @@ export function HabitQuizTab({ onPoints }: Props) {
       onPoints?.();
     }
     setSaved(true);
+    setSavedProfile(payload);
+    setRetaking(false);
   }, [arch, answers, insights, onPoints]);
+
+  const startRetake = () => {
+    localStorage.removeItem(KAI_HABIT_PROFILE_KEY);
+    setSavedProfile(null);
+    setRetaking(true);
+    setIdx(0);
+    setAnswers([]);
+    setSelected(null);
+    setDone(false);
+    setSaved(false);
+  };
+
+  const showProfileOnly = savedProfile && !retaking;
+  const showQuiz = !showProfileOnly;
+
+  if (showProfileOnly) {
+    return (
+      <div className="space-y-6">
+        <DailyReflectionCard onPoints={onPoints} />
+        <div className="kai-card p-5">
+          <h2 className="kai-heading text-lg font-semibold tracking-[0.05em]">
+            {savedProfile.title}
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-[#E8DCC8]">
+            {savedProfile.body}
+          </p>
+          <ul className="mt-4 space-y-2 text-sm text-[#E8DCC8]/85">
+            {savedProfile.insights.map((line, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="text-[#C9A84C]">•</span>
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-xs text-[#E8DCC8]/45">
+            Profile saved {new Date(savedProfile.savedAt).toLocaleDateString()}
+          </p>
+          {canRetake ? (
+            <button
+              type="button"
+              onClick={startRetake}
+              className="kai-btn-shimmer mt-6 w-full rounded-xl border border-[rgba(201,168,76,0.45)] bg-black py-3 text-sm font-medium text-[#C9A84C]"
+            >
+              Retake quiz
+            </button>
+          ) : (
+            <p className="mt-6 text-center text-sm text-[#E8DCC8]/55">
+              Quiz resets in {retakeDaysLeft}{" "}
+              {retakeDaysLeft === 1 ? "day" : "days"}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (done && arch) {
     return (
       <div className="space-y-6">
+        <DailyReflectionCard onPoints={onPoints} />
         <div className="kai-card p-5">
           <h2 className="kai-heading text-lg font-semibold tracking-[0.05em]">
             {arch.title}
@@ -268,6 +491,7 @@ export function HabitQuizTab({ onPoints }: Props) {
 
   return (
     <div className="space-y-4">
+      <DailyReflectionCard onPoints={onPoints} />
       <div className="kai-card p-5">
         <h2 className="kai-heading text-lg font-semibold tracking-[0.05em]">
           Know Your Patterns

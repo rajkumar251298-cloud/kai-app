@@ -182,11 +182,11 @@ export function KaiProgressBubble() {
             transition={{ type: "spring", stiffness: 420, damping: 28 }}
             className="absolute bottom-[calc(100%+10px)] right-0 w-[min(300px,calc(100vw-24px))] rounded-2xl border border-[rgba(201,168,76,0.35)] bg-[#111111] p-4 shadow-[0_12px_40px_rgba(0,0,0,0.65),0_0_24px_rgba(201,168,76,0.12)]"
             role="dialog"
-            aria-label="Today’s progress"
+            aria-label="Games and progress"
           >
             <div className="mb-3 flex items-start justify-between gap-2">
               <p className="kai-heading text-sm font-semibold text-[#F5F0E8]">
-                Today&apos;s Progress
+                Mind games
               </p>
               <button
                 type="button"
@@ -199,95 +199,89 @@ export function KaiProgressBubble() {
             </div>
 
             <div className="space-y-3 text-sm text-[#E8DCC8]">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[rgba(201,168,76,0.12)] pb-3">
-                <span>Check-in</span>
-                <span className="text-lg" aria-hidden>
-                  {snapshot.checkin ? "✅" : "⬜"}
-                </span>
+              <div className="flex justify-between gap-2 rounded-xl border border-[rgba(201,168,76,0.15)] bg-black/50 px-3 py-2">
+                <Link
+                  href="/dashboard?tab=games&game=word"
+                  onClick={() => setOpen(false)}
+                  className="flex min-h-[44px] flex-1 flex-col items-center justify-center rounded-lg border border-[rgba(201,168,76,0.22)] bg-black py-2 text-center text-xs transition hover:border-[rgba(201,168,76,0.45)]"
+                >
+                  <span className="text-lg">🔤</span>
+                  <span className="text-[10px] text-[#E8DCC8]/80">Word</span>
+                  <span
+                    className={`mt-0.5 h-1.5 w-1.5 rounded-full ${snapshot.wordDone ? "bg-emerald-500" : "bg-[#C9A84C]"}`}
+                    aria-hidden
+                  />
+                </Link>
+                <Link
+                  href="/dashboard?tab=games&game=memory"
+                  onClick={() => setOpen(false)}
+                  className="flex min-h-[44px] flex-1 flex-col items-center justify-center rounded-lg border border-[rgba(201,168,76,0.22)] bg-black py-2 text-center text-xs transition hover:border-[rgba(201,168,76,0.45)]"
+                >
+                  <span className="text-lg">🃏</span>
+                  <span className="text-[10px] text-[#E8DCC8]/80">
+                    Memory
+                  </span>
+                  <span
+                    className={`mt-0.5 h-1.5 w-1.5 rounded-full ${snapshot.memDone ? "bg-emerald-500" : "bg-[#C9A84C]"}`}
+                    aria-hidden
+                  />
+                </Link>
+                <Link
+                  href="/dashboard?tab=games&game=logic"
+                  onClick={() => setOpen(false)}
+                  className="flex min-h-[44px] flex-1 flex-col items-center justify-center rounded-lg border border-[rgba(201,168,76,0.22)] bg-black py-2 text-center text-xs transition hover:border-[rgba(201,168,76,0.45)]"
+                >
+                  <span className="text-lg">🧩</span>
+                  <span className="text-[10px] text-[#E8DCC8]/80">Logic</span>
+                  <span
+                    className={`mt-0.5 h-1.5 w-1.5 rounded-full ${snapshot.logDone ? "bg-emerald-500" : "bg-[#C9A84C]"}`}
+                    aria-hidden
+                  />
+                </Link>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[rgba(201,168,76,0.12)] pb-3">
-                <span>Points today</span>
-                <span className="font-semibold text-[#C9A84C]">
-                  ⚡ {snapshot.ptsToday} pts
-                </span>
-              </div>
-              <div className="border-b border-[rgba(201,168,76,0.12)] pb-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#E8DCC8]/45">
-                  Quick games
-                </p>
-                <div className="flex justify-between gap-2">
-                  <Link
-                    href="/dashboard?tab=games&game=word"
-                    onClick={() => setOpen(false)}
-                    className="flex min-h-[44px] flex-1 flex-col items-center justify-center rounded-xl border border-[rgba(201,168,76,0.22)] bg-black py-2 text-center text-xs transition hover:border-[rgba(201,168,76,0.45)]"
-                  >
-                    <span className="text-lg">🔤</span>
-                    <span className="text-[10px] text-[#E8DCC8]/80">Word</span>
-                    <span
-                      className={`mt-0.5 h-1.5 w-1.5 rounded-full ${snapshot.wordDone ? "bg-emerald-500" : "bg-[#C9A84C]"}`}
-                      aria-hidden
-                    />
-                  </Link>
-                  <Link
-                    href="/dashboard?tab=games&game=memory"
-                    onClick={() => setOpen(false)}
-                    className="flex min-h-[44px] flex-1 flex-col items-center justify-center rounded-xl border border-[rgba(201,168,76,0.22)] bg-black py-2 text-center text-xs transition hover:border-[rgba(201,168,76,0.45)]"
-                  >
-                    <span className="text-lg">🃏</span>
-                    <span className="text-[10px] text-[#E8DCC8]/80">
-                      Memory
-                    </span>
-                    <span
-                      className={`mt-0.5 h-1.5 w-1.5 rounded-full ${snapshot.memDone ? "bg-emerald-500" : "bg-[#C9A84C]"}`}
-                      aria-hidden
-                    />
-                  </Link>
-                  <Link
-                    href="/dashboard?tab=games&game=logic"
-                    onClick={() => setOpen(false)}
-                    className="flex min-h-[44px] flex-1 flex-col items-center justify-center rounded-xl border border-[rgba(201,168,76,0.22)] bg-black py-2 text-center text-xs transition hover:border-[rgba(201,168,76,0.45)]"
-                  >
-                    <span className="text-lg">🧩</span>
-                    <span className="text-[10px] text-[#E8DCC8]/80">Logic</span>
-                    <span
-                      className={`mt-0.5 h-1.5 w-1.5 rounded-full ${snapshot.logDone ? "bg-emerald-500" : "bg-[#C9A84C]"}`}
-                      aria-hidden
-                    />
-                  </Link>
+
+              <Link
+                href="/dashboard?tab=games"
+                onClick={() => setOpen(false)}
+                className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-[rgba(201,168,76,0.28)] bg-black text-xs font-medium text-[#C9A84C] transition hover:border-[rgba(201,168,76,0.45)]"
+              >
+                All games on Dashboard →
+              </Link>
+
+              <div className="border-t border-[rgba(201,168,76,0.12)] pt-3 text-xs text-[#E8DCC8]/55">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>Check-in today</span>
+                  <span aria-hidden>{snapshot.checkin ? "✅" : "⬜"}</span>
                 </div>
-              </div>
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1.5">
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <span>Points today</span>
+                  <span className="font-semibold text-[#C9A84C]">
+                    ⚡ {snapshot.ptsToday}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1">
                     <span aria-hidden>🔥</span>
-                    <span>Streak</span>
+                    Streak
                   </span>
                   <span className="font-semibold text-[#C9A84C]">
                     {snapshot.streak} days
                   </span>
                 </div>
-                <div className="flex justify-between gap-1">
+                <div className="mt-2 flex justify-between gap-1">
                   {snapshot.week.map((done, i) => (
                     <div
                       key={i}
-                      className={`h-2 flex-1 rounded-full ${done ? "bg-[#C9A84C]" : "bg-white/[0.08]"}`}
+                      className={`h-1.5 flex-1 rounded-full ${done ? "bg-[#C9A84C]" : "bg-white/[0.08]"}`}
                       title={done ? "Check-in" : "Missed"}
                     />
                   ))}
                 </div>
+                <p className="mt-2 text-center text-[#E8DCC8]/45">
+                  Total · ⚡ {snapshot.totalPts} pts
+                </p>
               </div>
-              <p className="text-center text-xs text-[#E8DCC8]/45">
-                Total · ⚡ {snapshot.totalPts} pts
-              </p>
             </div>
-
-            <Link
-              href="/chat?mode=checkin"
-              onClick={() => setOpen(false)}
-              className="kai-btn-shimmer mt-4 flex min-h-[48px] w-full items-center justify-center rounded-xl border border-[rgba(201,168,76,0.45)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] text-sm font-semibold text-black/90"
-            >
-              Quick check-in →
-            </Link>
           </motion.div>
         )}
       </AnimatePresence>
@@ -300,7 +294,7 @@ export function KaiProgressBubble() {
         onPointerCancel={onPointerUp}
         className="flex h-14 w-14 cursor-grab touch-none items-center justify-center rounded-full border-2 border-[rgba(201,168,76,0.45)] bg-black text-xl text-[#C9A84C] shadow-[0_0_20px_rgba(201,168,76,0.2)] active:cursor-grabbing"
         style={{ width: BUBBLE_SIZE, height: BUBBLE_SIZE }}
-        aria-label={open ? "Close progress" : "Open today’s progress"}
+        aria-label={open ? "Close games menu" : "Open games and progress"}
         aria-expanded={open}
       >
         ⚡

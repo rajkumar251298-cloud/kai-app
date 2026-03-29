@@ -3,6 +3,7 @@
 import { useAuth } from "@/components/AuthProvider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 const nav = [
   { href: "/", label: "Home", icon: "🏠" },
@@ -15,7 +16,10 @@ const baseNav =
   "inline-flex origin-center rounded-xl border transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out";
 
 const signInBtnClass =
-  "kai-btn-shimmer inline-flex shrink-0 items-center justify-center rounded-xl border border-[rgba(201,168,76,0.45)] bg-black px-4 py-2 text-sm font-medium text-[#C9A84C] transition hover:border-[rgba(201,168,76,0.65)] hover:text-[#F5E6B3]";
+  "kai-btn-shimmer inline-flex shrink-0 items-center justify-center rounded-xl border border-[rgba(201,168,76,0.45)] bg-black px-4 py-2 text-sm font-medium text-[#C9A84C] transition hover:border-[rgba(201,168,76,0.65)] hover:text-[#F5F0E8]";
+
+const MENU_ITEM =
+  "flex min-h-[44px] w-full items-center px-4 py-2.5 text-left text-sm text-[#E8DCC8] transition hover:bg-[rgba(201,168,76,0.08)] hover:text-[#F5F0E8]";
 
 function HeaderProfileAvatar() {
   const { user, loading } = useAuth();
@@ -62,6 +66,127 @@ function HeaderProfileAvatar() {
   );
 }
 
+function KaiBrandMenu() {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      const el = wrapRef.current;
+      if (el && !el.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const close = () => setOpen(false);
+
+  return (
+    <div ref={wrapRef} className="relative flex min-w-0 shrink-0 items-center gap-0.5 sm:gap-1">
+      <Link
+        href="/"
+        className="flex min-w-0 items-center gap-2.5 rounded-xl pr-1 outline-none ring-[rgba(201,168,76,0.35)] transition hover:opacity-95 focus-visible:ring-2 sm:gap-3 sm:pr-2"
+        aria-label="KAI home"
+        onClick={close}
+      >
+        <div
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgba(201,168,76,0.28)] bg-black text-lg leading-none text-[#C9A84C] shadow-[0_0_20px_rgba(201,168,76,0.18)]"
+          aria-hidden
+        >
+          ⚡
+        </div>
+        <div className="min-w-0 text-left">
+          <p className="kai-heading text-[18px] font-semibold leading-tight">
+            KAI
+          </p>
+          <p className="text-[10px] leading-tight text-[#E8DCC8]/75">
+            Keep At It
+          </p>
+        </div>
+      </Link>
+
+      <button
+        type="button"
+        className="flex h-10 w-9 shrink-0 items-center justify-center rounded-xl border border-transparent text-[#C9A84C]/90 transition hover:border-[rgba(201,168,76,0.22)] hover:bg-[rgba(201,168,76,0.06)]"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="KAI menu: check-in, settings, contact"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="text-lg leading-none" aria-hidden>
+          ⋮
+        </span>
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 top-[calc(100%+6px)] z-[60] w-[min(17.5rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[rgba(201,168,76,0.28)] bg-[#111111] py-1 shadow-[0_16px_48px_rgba(0,0,0,0.75),0_0_24px_rgba(201,168,76,0.1)]"
+          role="menu"
+        >
+          <Link
+            href="/chat?mode=checkin"
+            role="menuitem"
+            className={MENU_ITEM}
+            onClick={close}
+          >
+            <span className="mr-2" aria-hidden>
+              ☀️
+            </span>
+            Daily check-in
+          </Link>
+          <Link
+            href="/profile#account"
+            role="menuitem"
+            className={MENU_ITEM}
+            onClick={close}
+          >
+            <span className="mr-2" aria-hidden>
+              ⚙️
+            </span>
+            Profile &amp; settings
+          </Link>
+          <Link
+            href="/profile#support"
+            role="menuitem"
+            className={MENU_ITEM}
+            onClick={close}
+          >
+            <span className="mr-2" aria-hidden>
+              ✉️
+            </span>
+            Contact us
+          </Link>
+          <div className="my-1 border-t border-[rgba(201,168,76,0.12)]" />
+          <Link
+            href="/privacy"
+            role="menuitem"
+            className={`${MENU_ITEM} text-[#E8DCC8]/85`}
+            onClick={close}
+          >
+            Privacy Policy
+          </Link>
+          <Link
+            href="/terms"
+            role="menuitem"
+            className={`${MENU_ITEM} text-[#E8DCC8]/85`}
+            onClick={close}
+          >
+            Terms of Service
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Header() {
   const pathname = usePathname();
 
@@ -69,29 +194,10 @@ export function Header() {
     <header
       className={`sticky top-0 z-50 border-b ${goldBorder} bg-black/80 backdrop-blur-md`}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-        <Link
-          href="/profile"
-          className="flex min-w-0 items-center gap-3 rounded-xl outline-none ring-[rgba(201,168,76,0.35)] transition hover:opacity-95 focus-visible:ring-2"
-          aria-label="Profile"
-        >
-          <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[rgba(201,168,76,0.28)] bg-black text-lg leading-none text-[#C9A84C] shadow-[0_0_20px_rgba(201,168,76,0.18)]"
-            aria-hidden
-          >
-            ⚡
-          </div>
-          <div className="min-w-0 text-left">
-            <p className="kai-heading text-[18px] font-semibold leading-tight">
-              KAI
-            </p>
-            <p className="text-[10px] leading-tight text-[#E8DCC8]/75">
-              Keep At It
-            </p>
-          </div>
-        </Link>
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:px-6">
+        <KaiBrandMenu />
 
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-3">
           <HeaderProfileAvatar />
 
           <nav

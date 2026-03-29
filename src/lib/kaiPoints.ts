@@ -95,6 +95,15 @@ function addUtcDays(isoDate: string, deltaDays: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
+/** UTC calendar: checked in 2 days ago but not yesterday (missed one day). */
+export function missedYesterdayOnly(): boolean {
+  const set = getCheckinDateSet();
+  const t = todayKey();
+  const y = addUtcDays(t, -1);
+  const y2 = addUtcDays(t, -2);
+  return !set.has(y) && set.has(y2);
+}
+
 /** Consecutive UTC calendar days with a recorded check-in, ending today. */
 export function getConsecutiveCheckinStreak(): number {
   const set = getCheckinDateSet();
@@ -144,6 +153,7 @@ export function markWordSolvedToday(): void {
   const was = localStorage.getItem(k) === "1";
   localStorage.setItem(k, "1");
   if (!was) bumpGamesPlayedCount();
+  tryAwardAllGamesBonus();
 }
 
 export function wasMemoryPlayedToday(): boolean {
@@ -155,6 +165,7 @@ export function markMemoryPlayedToday(): void {
   const was = localStorage.getItem(k) === "1";
   localStorage.setItem(k, "1");
   if (!was) bumpGamesPlayedCount();
+  tryAwardAllGamesBonus();
 }
 
 export function wasLogicPlayedToday(): boolean {
@@ -166,6 +177,7 @@ export function markLogicPlayedToday(): void {
   const was = localStorage.getItem(k) === "1";
   localStorage.setItem(k, "1");
   if (!was) bumpGamesPlayedCount();
+  tryAwardAllGamesBonus();
 }
 
 export function getMemoryBestMoves(): number | null {
@@ -182,10 +194,79 @@ export function saveMemoryBestMoves(moves: number): void {
   }
 }
 
+function memoryBestScoreKey(isoDate: string): string {
+  return `memoryBestScore_${isoDate}`;
+}
+
+export function getMemoryBestForDate(isoDate: string): number | null {
+  if (typeof window === "undefined") return null;
+  const v = localStorage.getItem(memoryBestScoreKey(isoDate));
+  if (!v) return null;
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+export function saveMemoryBestForDate(isoDate: string, moves: number): void {
+  const cur = getMemoryBestForDate(isoDate);
+  if (cur === null || moves < cur) {
+    localStorage.setItem(memoryBestScoreKey(isoDate), String(moves));
+  }
+}
+
+const PERFECT_GAMES_KEY_PREFIX = "kaiPerfectGames_";
+const DAILY_REFLECTION_PTS_PREFIX = "kaiDailyReflectionPts_";
+
+/** +5 once per calendar day after answering the daily reflection. */
+export function tryAwardDailyReflectionPoints(): boolean {
+  if (typeof window === "undefined") return false;
+  const k = `${DAILY_REFLECTION_PTS_PREFIX}${todayKey()}`;
+  if (localStorage.getItem(k)) return false;
+  localStorage.setItem(k, "1");
+  addPoints(5);
+  return true;
+}
+
+/** +10 once per day when word, memory, and logic are all completed. */
+export function tryAwardAllGamesBonus(): void {
+  if (typeof window === "undefined") return;
+  if (!wasWordSolvedToday() || !wasMemoryPlayedToday() || !wasLogicPlayedToday())
+    return;
+  const k = `${PERFECT_GAMES_KEY_PREFIX}${todayKey()}`;
+  if (localStorage.getItem(k)) return;
+  localStorage.setItem(k, "1");
+  addPoints(10);
+}
+
 function yesterdayKey(): string {
   const d = new Date();
   d.setDate(d.getDate() - 1);
   return d.toISOString().slice(0, 10);
+}
+
+export function getPointsEarnedForDate(isoDate: string): number {
+  if (typeof window === "undefined") return 0;
+  return (
+    parseInt(localStorage.getItem(`kaiPointsEarned_${isoDate}`) || "0", 10) ||
+    0
+  );
+}
+
+/** Count distinct game plays (word / memory / logic) on the given ISO dates. */
+export function countGamesPlayedOnDates(dates: string[]): number {
+  if (typeof window === "undefined") return 0;
+  let n = 0;
+  for (const d of dates) {
+    if (localStorage.getItem(`kaiWordPuzzle_${d}`) === "1") n += 1;
+    if (localStorage.getItem(`kaiMemoryGame_${d}`) === "1") n += 1;
+    if (localStorage.getItem(`kaiLogicGame_${d}`) === "1") n += 1;
+  }
+  return n;
+}
+
+/** How many of the given ISO dates have a recorded check-in. */
+export function countCheckinsOnDates(dates: string[]): number {
+  const set = getCheckinDateSet();
+  return dates.reduce((acc, d) => acc + (set.has(d) ? 1 : 0), 0);
 }
 
 /** +20 once per calendar day when daily check-in is marked complete (call from chat/home). */
@@ -197,6 +278,10 @@ export function tryAwardDailyCheckin(): boolean {
   bumpTotalCheckins();
   addPoints(20);
   bumpCheckinStreak();
+  const h = new Date().getHours();
+  if (h < 8) {
+    localStorage.setItem("kaiEarlyBirdCheckin", "1");
+  }
   return true;
 }
 

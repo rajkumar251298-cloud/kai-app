@@ -1,35 +1,19 @@
 "use client";
 
+import { WORD_LIST_365 } from "@/data/wordPuzzle365";
+import { dayOfYearDisplay, dayOfYearLocal } from "@/lib/dayOfYear";
 import {
   addPoints,
   markWordSolvedToday,
-  todayKey,
   wasWordSolvedToday,
 } from "@/lib/kaiPoints";
 import { useCallback, useMemo, useState } from "react";
-
-const WORDS = [
-  "GROWTH",
-  "HABITS",
-  "TARGET",
-  "HUSTLE",
-  "REWARD",
-  "COMMIT",
-  "DRIVEN",
-  "STRIVE",
-] as const;
-
-function seedFromDate(d: string): number {
-  let h = 0;
-  for (let i = 0; i < d.length; i++) h = (h << 5) - h + d.charCodeAt(i);
-  return Math.abs(h);
-}
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
+    [a[i], a[j]] = [a[j]!, a[i]!];
   }
   return a;
 }
@@ -37,10 +21,10 @@ function shuffle<T>(arr: T[]): T[] {
 type Props = { onPoints?: () => void };
 
 export function WordPuzzleGame({ onPoints }: Props) {
+  const doy = dayOfYearLocal();
   const word = useMemo(() => {
-    const d = todayKey();
-    return WORDS[seedFromDate(d) % WORDS.length];
-  }, []);
+    return WORD_LIST_365[doy % WORD_LIST_365.length]!;
+  }, [doy]);
 
   const [shuffled] = useState(() => shuffle(word.split("")));
   const [progress, setProgress] = useState<string[]>([]);
@@ -114,6 +98,9 @@ export function WordPuzzleGame({ onPoints }: Props) {
           );
         })}
       </div>
+      <p className="mt-4 text-center text-xs text-[#E8DCC8]/50">
+        Word {dayOfYearDisplay()} of the year · Resets tomorrow at midnight
+      </p>
       {won && (
         <div className="kai-msg-animate mt-4 rounded-xl border border-[rgba(201,168,76,0.35)] bg-[rgba(201,168,76,0.08)] p-3 text-center shadow-[0_0_24px_rgba(201,168,76,0.2)]">
           <p className="text-2xl" aria-hidden>

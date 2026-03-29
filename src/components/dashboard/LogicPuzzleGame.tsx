@@ -1,49 +1,20 @@
 "use client";
 
+import { LOGIC_PATTERN_SETS } from "@/data/logicPatternSets";
+import { dayOfYearLocal } from "@/lib/dayOfYear";
 import {
   addPoints,
   markLogicPlayedToday,
   wasLogicPlayedToday,
 } from "@/lib/kaiPoints";
-import { useRef, useState } from "react";
-
-type Round = {
-  sequence: string[];
-  options: string[];
-  answer: string;
-};
-
-const ROUNDS: Round[] = [
-  {
-    sequence: ["🌱", "🌿", "🌳", "❓"],
-    options: ["🌲", "🍂", "🪨", "💧"],
-    answer: "🌲",
-  },
-  {
-    sequence: ["1️⃣", "2️⃣", "3️⃣", "❓"],
-    options: ["4️⃣", "5️⃣", "6️⃣", "0️⃣"],
-    answer: "4️⃣",
-  },
-  {
-    sequence: ["☀️", "🌤️", "⛅", "❓"],
-    options: ["🌥️", "🌧️", "❄️", "🌈"],
-    answer: "🌥️",
-  },
-  {
-    sequence: ["⚡", "⚡", "✨", "❓"],
-    options: ["✨", "⭐", "🌙", "💫"],
-    answer: "⭐",
-  },
-  {
-    sequence: ["🎯", "🎯", "🏆", "❓"],
-    options: ["🏆", "🥈", "📌", "✅"],
-    answer: "🏆",
-  },
-];
+import { useEffect, useRef, useState } from "react";
 
 type Props = { onPoints?: () => void };
 
 export function LogicPuzzleGame({ onPoints }: Props) {
+  const patternIndex = dayOfYearLocal() % LOGIC_PATTERN_SETS.length;
+  const ROUNDS = LOGIC_PATTERN_SETS[patternIndex]!;
+
   const [round, setRound] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
@@ -57,29 +28,34 @@ export function LogicPuzzleGame({ onPoints }: Props) {
   const selectOption = (opt: string) => {
     if (finished || playedToday || picked !== null) return;
     setPicked(opt);
-    if (opt === current.answer) setCorrectCount((c) => c + 1);
   };
 
   const advance = () => {
     if (picked === null) return;
+    const isCorrect = picked === current.answer;
+    const nextCorrect = correctCount + (isCorrect ? 1 : 0);
     if (!isLast) {
       setRound((r) => r + 1);
+      setCorrectCount(nextCorrect);
       setPicked(null);
       return;
     }
+    setCorrectCount(nextCorrect);
     setFinished(true);
-    if (awardedRef.current || playedToday) return;
+  };
+
+  useEffect(() => {
+    if (!finished || playedToday || awardedRef.current) return;
     awardedRef.current = true;
     markLogicPlayedToday();
-    const final = correctCount;
     let pts = 0;
-    if (final === 5) pts = 25;
-    else if (final >= 3) pts = 15;
+    if (correctCount === 5) pts = 25;
+    else if (correctCount >= 3) pts = 15;
     if (pts > 0) {
       addPoints(pts);
       onPoints?.();
     }
-  };
+  }, [finished, correctCount, playedToday, onPoints]);
 
   const displayFinal = finished ? correctCount : null;
 
@@ -88,17 +64,20 @@ export function LogicPuzzleGame({ onPoints }: Props) {
       <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#C9A84C]/80">
         Logic pattern — round {Math.min(round + 1, 5)} / 5
       </p>
+      <p className="mt-1 text-xs text-[#E8DCC8]/55">
+        Puzzle {patternIndex + 1} of {LOGIC_PATTERN_SETS.length} · Rotates daily
+      </p>
       {!finished && (
         <>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-3xl">
             {current.sequence.map((e, i) => (
-              <span key={i}>{e}</span>
+              <span key={`${round}-seq-${i}`}>{e}</span>
             ))}
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2">
-            {current.options.map((opt) => (
+            {current.options.map((opt, oi) => (
               <button
-                key={opt}
+                key={`${round}-${oi}-${opt}`}
                 type="button"
                 disabled={picked !== null || playedToday}
                 onClick={() => selectOption(opt)}

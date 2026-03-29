@@ -17,6 +17,7 @@ function isPublicPath(pathname: string) {
   if (pathname === "/profile" || pathname.startsWith("/profile/")) return true;
   if (pathname === "/privacy" || pathname.startsWith("/privacy/")) return true;
   if (pathname === "/terms" || pathname.startsWith("/terms/")) return true;
+  if (pathname === "/report" || pathname.startsWith("/report/")) return true;
   return false;
 }
 

@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const tabs = [
-  { href: "/", label: "Home", icon: "🏠" },
-  { href: "/board", label: "Team", icon: "👥" },
-  { href: "/dashboard", label: "Stats", icon: "📊" },
+  { href: "/", label: "KAI", icon: "⚡" },
+  { href: "/board", label: "Board", icon: "👥" },
+  { href: "/dashboard", label: "Dashboard", icon: "📊" },
   { href: "/profile", label: "Profile", icon: "👤" },
 ] as const;
 
@@ -41,14 +41,14 @@ export function MobileBottomNav() {
                 />
               </div>
               <span
-                className={`text-2xl leading-none ${active ? "" : "opacity-40"}`}
+                className={`text-2xl leading-none ${active ? "" : "opacity-50"}`}
                 aria-hidden
               >
                 {icon}
               </span>
               <span
                 className={`text-[10px] font-medium leading-tight ${
-                  active ? "text-[#C9A84C]" : "text-white/40"
+                  active ? "text-[#C9A84C]" : "text-white/50"
                 }`}
               >
                 {label}

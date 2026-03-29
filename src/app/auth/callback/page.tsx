@@ -1,20 +1,17 @@
 "use client";
 
+import { safeNextPath } from "@/lib/authPaths";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { syncUserProfileToSupabase } from "@/lib/syncUserProfileToSupabase";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-function safeNextPath(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/";
-  return raw;
-}
-
 export default function AuthCallbackPage() {
   const router = useRouter();
-  const [message, setMessage] = useState("Signing you in…");
+  const [message, setMessage] = useState("Setting things up…");
 
   useEffect(() => {
-    const run = async () => {
+    const handleLogin = async () => {
       if (!isSupabaseConfigured) {
         setMessage("Auth isn’t configured yet.");
         router.replace("/login");
@@ -34,18 +31,28 @@ export default function AuthCallbackPage() {
         await supabase.auth.getSession();
       }
 
+      const { data, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !data.user) {
+        router.replace("/login");
+        return;
+      }
+
+      await syncUserProfileToSupabase(data.user);
+
+      // Keep userName / userGoal / checkInTime in localStorage — KAI reads them on home, chat, profile.
+
       const hasName = localStorage.getItem("userName")?.trim();
       const next = safeNextPath(sessionStorage.getItem("kaiAuthNext"));
       sessionStorage.removeItem("kaiAuthNext");
       router.replace(hasName ? next : "/onboarding");
     };
 
-    void run();
+    void handleLogin();
   }, [router]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-black px-6 text-center text-sm text-[#E8DCC8]">
-      {message}
+    <div className="flex h-screen min-h-screen items-center justify-center bg-black px-6 text-center text-white">
+      <p className="text-sm text-[#C9A84C]">{message}</p>
     </div>
   );
 }

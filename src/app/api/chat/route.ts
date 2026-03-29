@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { formatMemoryBlock, type KaiMemory } from "@/lib/kaiMemory";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -9,20 +10,85 @@ type ChatMode = "checkin" | "stuck" | "plan" | "ideas";
 
 type IncomingMessage = { role: "user" | "assistant"; content: string };
 
+const EMPTY_MEMORY: KaiMemory = {
+  lastTask: null,
+  lastCompleted: null,
+  lastExcuse: null,
+  lastWin: null,
+  commitmentDate: null,
+};
+
+function normalizeMemory(raw: unknown): KaiMemory {
+  if (!raw || typeof raw !== "object") return EMPTY_MEMORY;
+  const o = raw as Record<string, unknown>;
+  const str = (k: string) => {
+    const v = o[k];
+    return typeof v === "string" && v.trim() ? v.trim() : null;
+  };
+  const lastCompletedRaw = o.lastCompleted;
+  let lastCompleted: boolean | null = null;
+  if (lastCompletedRaw === true) lastCompleted = true;
+  else if (lastCompletedRaw === false) lastCompleted = false;
+  return {
+    lastTask: str("lastTask"),
+    lastCompleted,
+    lastExcuse: str("lastExcuse"),
+    lastWin: str("lastWin"),
+    commitmentDate: str("commitmentDate"),
+  };
+}
+
+const CHECKIN_CORE = `You are KAI — a human-like accountability coach, not a polite assistant.
+Voice: warm but direct. No corporate fluff. Action over motivation.
+Rules:
+- 2–4 sentences max per reply unless you are listing numbered options (stuck mode).
+- ONE clear question OR one sharp instruction — not both long.
+- If the user is vague (e.g. "work on business"), call it out: "That's vague. What exactly are you doing?"
+- If they failed or dodged: "Not going to pretend that's fine. What got in the way?"
+- If they delivered: "Good. Now what's next?"
+- Do not accept lazy excuses; push for specifics and next action.
+- You may rarely use a short beat on its own line: "..." or "Alright." before the next sentence (sparingly).
+
+Machine lines (never show the user; put each alone on its own line at the END of your reply when applicable):
+- When they lock a specific task for TODAY, add: COMMIT: <single-line concrete task>
+- When they admit what blocked them, add: EXCUSE: <short paraphrase>
+- When they report a real win, add: WIN: <short phrase>
+
+When the user has clearly committed to what they will do today (or you end a check-in after they've stated it), end that reply with exactly ONE closing pressure line as the final sentence (no quotes):
+I'm expecting this done today.
+OR: Don't break the streak.
+OR: Let's see if you actually follow through.`;
+
 function buildSystemPrompt(
   chatMode: ChatMode,
   userName: string,
   userGoal: string,
+  memory: KaiMemory,
 ): string {
+  const memoryBlock = formatMemoryBlock(memory);
+  const memSection = `--- Accountability memory (use in your tone; reference honestly) ---\n${memoryBlock}`;
+
   switch (chatMode) {
     case "checkin":
-      return `You are KAI, an elite accountability coach. The user's name is ${userName}. Their 90-day goal is: ${userGoal}. Be direct, warm, and brief — 2 to 4 sentences max. Ask ONE question at a time. Push them to be specific. Celebrate wins enthusiastically. Push back firmly but kindly if they are slipping. After 4-5 exchanges wrap up with a strong motivational closing line.`;
+      return `${CHECKIN_CORE}
+
+User name: ${userName}
+90-day goal: ${userGoal}
+
+${memSection}`;
     case "stuck":
-      return `You are KAI. The user is BLOCKED on something. Give exactly 3 numbered concrete options they can try RIGHT NOW. Be decisive. No generic advice. Then ask which one they will pick.`;
+      return `You are KAI. The user is blocked — they need traction, not empathy theater.
+${memSection}
+
+Give exactly 3 numbered concrete options they can try in the next 30 minutes. Decisive, no generic advice.
+2–4 sentences of setup + the list. Then ask which one they pick — and COMMIT line when they choose.`;
     case "plan":
-      return `You are KAI reviewing the user's weekly plan. Look for gaps, risks, unrealistic scheduling, priority misalignment. Be honest and specific. Max 4-5 sentences per reply.`;
+      return `You are KAI reviewing their plan. ${memSection}
+Find gaps, risks, and fantasy scheduling. Honest, brief (2–4 sentences per turn). No softening.`;
     case "ideas":
-      return `You are KAI, a creative brainstorm partner. Generate 4-6 bold specific actionable ideas as a numbered list. Each idea = 1 punchy sentence + 1 sentence explaining why it works. End by asking which one they want to go deeper on.`;
+      return `You are KAI brainstorming. ${memSection}
+4–6 bold, specific ideas as a numbered list; each = one punchy line + one line why it works.
+2–4 sentences framing. End asking which to go deeper on.`;
     default: {
       const _exhaustive: never = chatMode;
       return _exhaustive;
@@ -48,11 +114,13 @@ export async function POST(req: Request) {
       userName,
       userGoal,
       chatMode,
+      memory,
     }: {
       messages?: unknown;
       userName?: unknown;
       userGoal?: unknown;
       chatMode?: unknown;
+      memory?: unknown;
     } = body;
 
     if (!Array.isArray(messages)) {
@@ -120,10 +188,12 @@ export async function POST(req: Request) {
     }
 
     const client = new Anthropic({ apiKey });
+    const mem = normalizeMemory(memory);
     const system = buildSystemPrompt(
       chatMode as ChatMode,
       userName,
       userGoal,
+      mem,
     );
 
     const response = await client.messages.create({

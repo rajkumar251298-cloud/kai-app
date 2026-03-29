@@ -1,8 +1,13 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { AppBootstrap } from "@/components/AppBootstrap";
+import {
+  DesktopQuickNav,
+  desktopQuickNavActivePath,
+} from "@/components/DesktopQuickNav";
 import { KaiProgressBubble } from "@/components/KaiProgressBubble";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { usePathname } from "next/navigation";
 
 export function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -18,11 +23,17 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
+  const padDesktopQuick = desktopQuickNavActivePath(pathname);
+
   return (
     <>
-      {children}
+      <div className={padDesktopQuick ? "md:pb-[52px]" : undefined}>
+        {children}
+      </div>
       <MobileBottomNav />
+      <DesktopQuickNav />
       <KaiProgressBubble />
+      <AppBootstrap />
     </>
   );
 }

@@ -4,12 +4,22 @@ import { useAuth } from "@/components/AuthProvider";
 import { Header } from "@/components/Header";
 import { HomeBackLink } from "@/components/HomeBackLink";
 import {
+  BadgesGrid,
+  LevelProgressCard,
+} from "@/components/LevelSystem";
+import {
   addGoal,
   loadGoals,
+  markGoalCompleted,
   removeGoal,
   updateGoal,
   type KaiGoal,
 } from "@/lib/kaiGoals";
+import {
+  KAI_LS_CHECK_IN_TIME,
+  KAI_LS_USER_NAME,
+  getStoredCheckInTime,
+} from "@/lib/kaiLocalProfile";
 import {
   getConsecutiveCheckinStreak,
   getGamesPlayedTotal,
@@ -18,10 +28,28 @@ import {
   habitQuizProfileSaved,
   KAI_HABIT_PROFILE_KEY,
 } from "@/lib/kaiPoints";
+import {
+  type BadgeId,
+  checkAndAwardBadges,
+  loadEarnedBadges,
+} from "@/lib/checkBadges";
+import {
+  cancelScheduledNotifications,
+  requestNotificationPermission,
+  saveNotificationPermissionStatus,
+  scheduleNotifications,
+  K_NOTIFY,
+} from "@/lib/notifications";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 const CARD =
   "rounded-2xl border border-[rgba(201,168,76,0.18)] bg-[#111111] p-4 shadow-[0_10px_30px_rgba(0,0,0,0.55)] sm:p-5";
@@ -32,12 +60,14 @@ const BTN_ROW =
 const GOLD_CTA =
   "kai-btn-shimmer flex min-h-[48px] w-full items-center justify-center rounded-xl border border-[rgba(201,168,76,0.45)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] text-sm font-semibold text-black/90";
 
-const K_USER = "userName";
-const K_CHECKIN_TIME = "checkinTime";
+const K_USER = KAI_LS_USER_NAME;
 const K_EMAIL = "kaiUserEmail";
-const K_NOTIFY = "kaiPrefsNotifications";
 const K_SOUND = "kaiPrefsSound";
 const K_REMINDER = "kaiDailyReminderTime";
+const KAI_APP_RATING_KEY = "kaiAppRating";
+
+const CONTACT_US_MAILTO =
+  `mailto:contactkai26@gmail.com?subject=${encodeURIComponent("KAI App Support")}&body=${encodeURIComponent("Hi KAI Support Team,\n\n")}`;
 
 function initialsFromName(name: string | null): string {
   if (!name?.trim()) return "?";
@@ -71,11 +101,14 @@ export default function ProfilePage() {
   const [timeDraft, setTimeDraft] = useState("");
   const [goalModal, setGoalModal] = useState<null | { mode: "add" } | { mode: "edit"; id: string; text: string }>(null);
   const [goalDraft, setGoalDraft] = useState("");
-  const [shareOpen, setShareOpen] = useState(false);
-  const [ratingOpen, setRatingOpen] = useState(false);
-  const [rating, setRating] = useState(0);
+  const [savedAppRating, setSavedAppRating] = useState(0);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [earnedBadges, setEarnedBadges] = useState<Set<BadgeId>>(new Set());
+  const shareToastTimer = useRef<number | null>(null);
 
   const refreshLocal = useCallback(() => {
+    checkAndAwardBadges();
+    setEarnedBadges(new Set(loadEarnedBadges()));
     setPoints(getTotalPoints());
     setGoals(loadGoals());
     setUserName(localStorage.getItem(K_USER)?.trim() || null);
@@ -92,6 +125,14 @@ export default function ProfilePage() {
     setSoundOn(localStorage.getItem(K_SOUND) !== "0");
     setReminderTime(localStorage.getItem(K_REMINDER) || "09:00");
     setEmailDisplay(localStorage.getItem(K_EMAIL) || "Not set — add in a future update");
+    const r = parseInt(localStorage.getItem(KAI_APP_RATING_KEY) ?? "0", 10);
+    setSavedAppRating(r >= 1 && r <= 5 ? r : 0);
+  }, []);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      saveNotificationPermissionStatus();
+    });
   }, []);
 
   useEffect(() => {
@@ -104,6 +145,27 @@ export default function ProfilePage() {
     return () => window.removeEventListener("kai-points-earned", onEarn);
   }, [refreshLocal]);
 
+  useEffect(() => {
+    if (!mounted || typeof window === "undefined") return;
+    const scrollToHash = () => {
+      const id = window.location.hash?.replace(/^#/, "").trim();
+      if (!id) return;
+      document.getElementById(id)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    };
+    queueMicrotask(scrollToHash);
+    window.addEventListener("hashchange", scrollToHash);
+    return () => window.removeEventListener("hashchange", scrollToHash);
+  }, [mounted]);
+
+  useEffect(() => {
+    return () => {
+      if (shareToastTimer.current) window.clearTimeout(shareToastTimer.current);
+    };
+  }, []);
+
   const streak = getConsecutiveCheckinStreak();
   const checkins = getTotalCheckins();
   const gamesN = getGamesPlayedTotal();
@@ -114,10 +176,24 @@ export default function ProfilePage() {
     setSoundOn(on);
   };
 
-  const persistNotify = (on: boolean) => {
-    localStorage.setItem(K_NOTIFY, on ? "1" : "0");
-    setNotificationsOn(on);
-  };
+  const persistNotify = useCallback(async (on: boolean) => {
+    if (on) {
+      const p = await requestNotificationPermission();
+      saveNotificationPermissionStatus();
+      if (p === "granted") {
+        localStorage.setItem(K_NOTIFY, "1");
+        setNotificationsOn(true);
+        scheduleNotifications();
+      } else {
+        localStorage.setItem(K_NOTIFY, "0");
+        setNotificationsOn(false);
+      }
+    } else {
+      localStorage.setItem(K_NOTIFY, "0");
+      setNotificationsOn(false);
+      cancelScheduledNotifications();
+    }
+  }, []);
 
   const persistReminder = (t: string) => {
     localStorage.setItem(K_REMINDER, t);
@@ -135,7 +211,10 @@ export default function ProfilePage() {
   const submitTime = (e: FormEvent) => {
     e.preventDefault();
     const t = timeDraft.trim();
-    if (t) localStorage.setItem(K_CHECKIN_TIME, t);
+    if (t) {
+      localStorage.setItem(KAI_LS_CHECK_IN_TIME, t);
+      localStorage.removeItem("checkinTime");
+    }
     setTimeModal(false);
   };
 
@@ -154,20 +233,29 @@ export default function ProfilePage() {
     setGoalDraft("");
   };
 
-  const shareText = `I’m staying accountable with KAI — ${typeof window !== "undefined" ? window.location.origin : "https://kaiapp.co"}`;
+  const persistAppRating = useCallback((n: number) => {
+    localStorage.setItem(KAI_APP_RATING_KEY, String(n));
+    setSavedAppRating(n);
+  }, []);
 
-  const handleShare = async () => {
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "KAI", text: shareText });
-      } else {
-        await navigator.clipboard.writeText(shareText);
-      }
-    } catch {
-      /* ignore */
-    }
-    setShareOpen(false);
-  };
+  const handleShareKai = useCallback(() => {
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : "";
+    const text = `I've been using KAI — an AI accountability coach that checks in with you every morning and actually pushes you to follow through. Try it: ${origin}`;
+    void navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        if (shareToastTimer.current)
+          window.clearTimeout(shareToastTimer.current);
+        setShareCopied(true);
+        const id = window.setTimeout(() => {
+          setShareCopied(false);
+          shareToastTimer.current = null;
+        }, 4000);
+        shareToastTimer.current = id;
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSignOut = async () => {
     try {
@@ -207,7 +295,7 @@ export default function ProfilePage() {
     <div className="flex min-h-screen flex-col bg-black">
       <Header />
 
-      <main className="mx-auto w-full max-w-lg flex-1 space-y-5 px-4 pb-10 pt-6 max-md:pb-[calc(80px+env(safe-area-inset-bottom,0px))] max-md:text-[15px]">
+      <main className="mx-auto w-full max-w-lg flex-1 space-y-5 px-4 pb-10 pt-0 max-md:pb-[calc(80px+env(safe-area-inset-bottom,0px))] max-md:text-[15px]">
         <HomeBackLink />
 
         {!authLoading && !user && isSupabaseConfigured && (
@@ -264,7 +352,10 @@ export default function ProfilePage() {
           </p>
         </header>
 
-        <section className={CARD}>
+        <LevelProgressCard />
+        <BadgesGrid earned={earnedBadges} />
+
+        <section id="account" className={`${CARD} scroll-mt-24`}>
           <h2 className="kai-heading mb-3 text-sm font-semibold tracking-[0.08em] text-[#F5F0E8]">
             Account
           </h2>
@@ -283,19 +374,22 @@ export default function ProfilePage() {
               type="button"
               className={BTN_ROW}
               onClick={() => {
-                setTimeDraft(localStorage.getItem(K_CHECKIN_TIME) || "7am");
+                setTimeDraft(getStoredCheckInTime() || "7am");
                 setTimeModal(true);
               }}
             >
               Change check-in time
             </button>
-            <div className="flex min-h-[44px] items-center justify-between gap-3 rounded-xl border border-[rgba(201,168,76,0.2)] bg-black px-4 py-2">
-              <span className="text-sm text-[#E8DCC8]">Notifications</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={notificationsOn}
-                onClick={() => persistNotify(!notificationsOn)}
+            <div className="rounded-xl border border-[rgba(201,168,76,0.2)] bg-black px-4 py-3">
+              <div className="flex min-h-[44px] items-center justify-between gap-3">
+                <span className="text-sm text-[#E8DCC8]">Smart nudges</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={notificationsOn}
+                  onClick={() => {
+                    void persistNotify(!notificationsOn);
+                  }}
                 className={`relative h-7 w-12 shrink-0 rounded-full border transition ${
                   notificationsOn
                     ? "border-[rgba(201,168,76,0.5)] bg-[rgba(201,168,76,0.25)]"
@@ -308,6 +402,10 @@ export default function ProfilePage() {
                   }`}
                 />
               </button>
+              </div>
+              <p className="mt-2 text-sm italic leading-snug text-[#C9A84C]/85">
+                e.g. Your future self is watching. Don&apos;t let them down. 💪
+              </p>
             </div>
             <div className="rounded-xl border border-[rgba(201,168,76,0.12)] bg-black/50 px-4 py-3">
               <p className="text-xs font-medium uppercase tracking-wide text-[#E8DCC8]/45">
@@ -336,6 +434,18 @@ export default function ProfilePage() {
                   <span className="min-w-0 flex-1 text-sm text-[#E8DCC8]">
                     {g.text}
                   </span>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-lg border border-[rgba(201,168,76,0.25)] px-3 py-2 text-xs font-medium text-[#E8DCC8]/80"
+                    onClick={() => {
+                      markGoalCompleted(g.id);
+                      setGoals(loadGoals());
+                      checkAndAwardBadges();
+                      setEarnedBadges(new Set(loadEarnedBadges()));
+                    }}
+                  >
+                    Done
+                  </button>
                   <button
                     type="button"
                     className="shrink-0 rounded-lg border border-[rgba(201,168,76,0.35)] px-3 py-2 text-xs font-medium text-[#C9A84C]"
@@ -438,49 +548,59 @@ export default function ProfilePage() {
           </ul>
         </section>
 
-        <section className={CARD}>
+        <section id="support" className={`${CARD} scroll-mt-24`}>
           <h2 className="kai-heading mb-3 text-sm font-semibold tracking-[0.08em] text-[#F5F0E8]">
             Support
           </h2>
           <div className="space-y-2">
-            <a
-              href="mailto:support@kaiapp.co"
-              className={`${BTN_ROW} !justify-center`}
-            >
+            <a href={CONTACT_US_MAILTO} className={`${BTN_ROW} !justify-center`}>
               Contact us
             </a>
-            <button
-              type="button"
-              className={BTN_ROW}
-              onClick={() => setRatingOpen((o) => !o)}
-            >
-              Rate the app
-            </button>
-            {ratingOpen && (
+            <div className="rounded-xl border border-[rgba(201,168,76,0.2)] bg-black/50 px-3 py-3">
+              <p className="mb-2 text-center text-xs font-semibold uppercase tracking-[0.12em] text-[#C9A84C]/90">
+                Rate the app
+              </p>
               <div
-                className="flex justify-center gap-1 rounded-xl border border-[rgba(201,168,76,0.15)] bg-black/40 py-3"
-                aria-label="Rating"
+                className="flex justify-center gap-0.5 sm:gap-1"
+                role="group"
+                aria-label="Rate KAI from 1 to 5 stars"
               >
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button
                     key={n}
                     type="button"
-                    className="min-h-[44px] min-w-[44px] text-2xl leading-none text-[#C9A84C] drop-shadow-[0_0_10px_rgba(201,168,76,0.35)] transition hover:scale-110"
-                    aria-label={`${n} stars`}
-                    onClick={() => setRating(n)}
+                    className="min-h-[48px] min-w-[44px] text-3xl leading-none text-[#C9A84C] drop-shadow-[0_0_12px_rgba(201,168,76,0.35)] transition hover:scale-110 active:scale-95"
+                    aria-label={`${n} star${n === 1 ? "" : "s"}`}
+                    onClick={() => persistAppRating(n)}
                   >
-                    {n <= rating ? "★" : "☆"}
+                    {n <= savedAppRating ? "★" : "☆"}
                   </button>
                 ))}
               </div>
-            )}
+              {savedAppRating > 0 && (
+                <p
+                  className="mt-2 text-center text-sm font-medium text-[#C9A84C]"
+                  role="status"
+                >
+                  Thanks for rating KAI ⭐
+                </p>
+              )}
+            </div>
             <button
               type="button"
               className={BTN_ROW}
-              onClick={() => setShareOpen(true)}
+              onClick={() => void handleShareKai()}
             >
               Share KAI
             </button>
+            {shareCopied && (
+              <p
+                className="text-center text-sm font-medium text-[#C9A84C]"
+                role="status"
+              >
+                Link copied! Share it anywhere 🚀
+              </p>
+            )}
             <Link href="/privacy" className={`${BTN_ROW} !justify-center`}>
               Privacy Policy
             </Link>
@@ -602,14 +722,6 @@ export default function ProfilePage() {
         </ModalWrap>
       )}
 
-      {shareOpen && (
-        <ModalWrap title="Share KAI" onClose={() => setShareOpen(false)}>
-          <p className="text-sm text-[#E8DCC8]/80">{shareText}</p>
-          <button type="button" className={`${GOLD_CTA} mt-4`} onClick={handleShare}>
-            Share or copy link
-          </button>
-        </ModalWrap>
-      )}
     </div>
   );
 }

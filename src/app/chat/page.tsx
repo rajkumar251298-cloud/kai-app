@@ -1,6 +1,20 @@
 "use client";
 
-import { tryAwardDailyCheckin } from "@/lib/kaiPoints";
+import {
+  KAI_LS_USER_NAME,
+  getStoredUserGoal,
+} from "@/lib/kaiLocalProfile";
+import {
+  buildCheckinOpening,
+  DEFAULT_CHECKIN_OPENING,
+} from "@/lib/kaiTodaysFocus";
+import {
+  memoryForApi,
+  parseAndApplyKaiMemoryFromReply,
+  readKaiMemory,
+  stripKaiMachineLines,
+} from "@/lib/kaiMemory";
+import { todayKey, tryAwardDailyCheckin } from "@/lib/kaiPoints";
 import { HomeBackLink } from "@/components/HomeBackLink";
 import { useSearchParams } from "next/navigation";
 import {
@@ -23,13 +37,11 @@ type ChatMessage = {
 };
 
 const STORAGE_KEYS = {
-  userName: "userName",
-  mainGoal: "mainGoal",
+  userName: KAI_LS_USER_NAME,
 } as const;
 
 const OPENINGS: Record<ChatMode, string> = {
-  checkin:
-    "Morning! What's the one thing you're tackling today that moves you toward your goal?",
+  checkin: DEFAULT_CHECKIN_OPENING,
   stuck:
     "Got it — you're blocked. Describe exactly what you're stuck on. The more specific, the faster we solve it.",
   plan:
@@ -143,7 +155,11 @@ function StreamingKaiBubble({
   fullText: string;
   onComplete: (full: string) => void;
 }) {
-  const tokens = useMemo(() => fullText.split(/(\s+)/), [fullText]);
+  const visibleText = useMemo(
+    () => stripKaiMachineLines(fullText),
+    [fullText],
+  );
+  const tokens = useMemo(() => visibleText.split(/(\s+)/), [visibleText]);
   const [count, setCount] = useState(0);
   const finished = useRef(false);
 
@@ -178,16 +194,42 @@ function ChatInner() {
   const mode = parseMode(searchParams.get("mode"));
   const topic = searchParams.get("topic")?.trim() ?? "";
 
-  const opening =
-    mode === "ideas" && topic
-      ? `${OPENINGS.ideas}\n\n(Topic from home: ${topic})`
-      : OPENINGS[mode];
+  const [openingLine, setOpeningLine] = useState<string>(() => {
+    if (mode === "ideas" && topic) {
+      return `${OPENINGS.ideas}\n\n(Topic from home: ${topic})`;
+    }
+    if (mode === "checkin") return DEFAULT_CHECKIN_OPENING;
+    return OPENINGS[mode];
+  });
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isAwaitingApi, setIsAwaitingApi] = useState(false);
   const [streaming, setStreaming] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const checkinPointsAwarded = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || mode !== "plan") return;
+    const k = `kaiPlanModeLogged_${todayKey()}`;
+    if (localStorage.getItem(k)) return;
+    localStorage.setItem(k, "1");
+    const n =
+      parseInt(localStorage.getItem("kaiPlanModeUsesTotal") || "0", 10) + 1;
+    localStorage.setItem("kaiPlanModeUsesTotal", String(n));
+  }, [mode]);
+
+  useLayoutEffect(() => {
+    if (mode === "ideas" && topic) {
+      setOpeningLine(`${OPENINGS.ideas}\n\n(Topic from home: ${topic})`);
+      return;
+    }
+    if (mode === "checkin") {
+      setOpeningLine(buildCheckinOpening(readKaiMemory()));
+      return;
+    }
+    setOpeningLine(OPENINGS[mode]);
+  }, [mode, topic]);
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -198,9 +240,10 @@ function ChatInner() {
   }, [messages, isAwaitingApi, streaming, scrollToBottom]);
 
   const onStreamComplete = useCallback((full: string) => {
+    const { display } = parseAndApplyKaiMemoryFromReply(full);
     setMessages((prev) => [
       ...prev,
-      { id: newId(), role: "kai", content: full },
+      { id: newId(), role: "kai", content: display },
     ]);
     setStreaming(null);
   }, []);
@@ -220,14 +263,18 @@ function ChatInner() {
     setInput("");
     setIsAwaitingApi(true);
 
+    if (mode === "ideas" && typeof window !== "undefined") {
+      const c =
+        parseInt(localStorage.getItem("kaiBrainstormCount") || "0", 10) + 1;
+      localStorage.setItem("kaiBrainstormCount", String(c));
+    }
+
     const userName =
       typeof window !== "undefined"
         ? localStorage.getItem(STORAGE_KEYS.userName) ?? ""
         : "";
     const userGoal =
-      typeof window !== "undefined"
-        ? localStorage.getItem(STORAGE_KEYS.mainGoal) ?? ""
-        : "";
+      typeof window !== "undefined" ? getStoredUserGoal() : "";
 
     try {
       const res = await fetch("/api/chat", {
@@ -238,6 +285,7 @@ function ChatInner() {
           userName,
           userGoal,
           chatMode: mode,
+          memory: memoryForApi(),
         }),
       });
       const data: { reply?: string; error?: string } = await res.json();
@@ -248,9 +296,12 @@ function ChatInner() {
       if (!reply) {
         throw new Error("Empty reply");
       }
+      const pauseMs = 800 + Math.random() * 400;
+      await new Promise((r) => window.setTimeout(r, pauseMs));
       setIsAwaitingApi(false);
       setStreaming(reply);
-      if (mode === "checkin") {
+      if (mode === "checkin" && !checkinPointsAwarded.current) {
+        checkinPointsAwarded.current = true;
         tryAwardDailyCheckin();
       }
     } catch (err) {
@@ -278,7 +329,7 @@ function ChatInner() {
         className={`sticky top-0 z-20 border-b px-4 py-3 backdrop-blur-md ${banner.barClass} border`}
       >
         <div className="mx-auto flex max-w-lg flex-col gap-1">
-          <HomeBackLink noMarginBottom />
+          <HomeBackLink bare labelBack />
           <div className="flex min-w-0 items-center gap-2">
             <span className="text-lg" aria-hidden>
               {banner.emoji}
@@ -292,7 +343,7 @@ function ChatInner() {
 
       <div className="mx-auto flex w-full max-w-lg flex-1 flex-col overflow-hidden">
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-          <KaiBubble content={opening} />
+          <KaiBubble content={openingLine} />
 
           {messages.map((m) =>
             m.role === "kai" ? (

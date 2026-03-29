@@ -129,6 +129,12 @@ export function DashboardView() {
   }, [toast]);
 
   const doneCount = WEEK_DONE.filter(Boolean).length;
+  const missedLastDay = !WEEK_DONE[6] && doneCount > 0;
+  const streakCopy = missedLastDay
+    ? "You broke the streak.\nStart again today — or don't."
+    : doneCount === 0
+      ? "You haven't shown up this week. That doesn't fix itself."
+      : `You showed up ${doneCount} days this week.\nMost people quit at 3.`;
 
   const tabBtn = (id: Tab, label: string) => {
     const active = tab === id;
@@ -202,7 +208,7 @@ export function DashboardView() {
           +{toast} pts
         </div>
       )}
-      <main className="mx-auto w-full max-w-lg flex-1 space-y-6 px-4 pb-10 pt-6 max-md:pb-[calc(80px+env(safe-area-inset-bottom,0px))] max-md:text-[15px]">
+      <main className="mx-auto w-full max-w-lg flex-1 space-y-6 px-4 pb-10 pt-0 max-md:pb-[calc(80px+env(safe-area-inset-bottom,0px))] max-md:text-[15px]">
         <HomeBackLink />
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="kai-heading min-w-0 flex-1 truncate text-xl font-semibold tracking-[0.05em]">
@@ -247,8 +253,8 @@ export function DashboardView() {
                   );
                 })}
               </div>
-              <p className="kai-heading mt-5 text-center text-3xl font-semibold tracking-[0.05em] sm:text-4xl">
-                {doneCount} / 7 days
+              <p className="mt-5 whitespace-pre-line text-center text-sm leading-relaxed text-[#E8DCC8] sm:text-[15px]">
+                {streakCopy}
               </p>
             </section>
 
@@ -299,6 +305,13 @@ export function DashboardView() {
                 ))}
               </ul>
             </section>
+
+            <Link
+              href="/report"
+              className="kai-btn-shimmer flex min-h-[48px] w-full items-center justify-center rounded-xl border border-[rgba(201,168,76,0.45)] bg-black py-3 text-sm font-semibold text-[#C9A84C] transition hover:border-[rgba(201,168,76,0.6)]"
+            >
+              View Weekly Report →
+            </Link>
           </>
         )}
 

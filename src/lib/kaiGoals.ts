@@ -3,6 +3,7 @@
 export type KaiGoal = { id: string; text: string };
 
 const KAI_GOALS_KEY = "kaiGoals";
+const LEGACY_USER_GOAL = "userGoal";
 const LEGACY_MAIN_GOAL = "mainGoal";
 
 function newId(): string {
@@ -28,7 +29,9 @@ export function loadGoals(): KaiGoal[] {
           .filter((g) => g.text.length > 0);
       }
     }
-    const legacy = localStorage.getItem(LEGACY_MAIN_GOAL)?.trim();
+    const legacy =
+      localStorage.getItem(LEGACY_USER_GOAL)?.trim() ||
+      localStorage.getItem(LEGACY_MAIN_GOAL)?.trim();
     if (legacy) {
       const migrated: KaiGoal[] = [{ id: "legacy-main-goal", text: legacy }];
       localStorage.setItem(KAI_GOALS_KEY, JSON.stringify(migrated));
@@ -61,4 +64,14 @@ export function updateGoal(id: string, text: string): void {
 
 export function removeGoal(id: string): void {
   saveGoals(loadGoals().filter((g) => g.id !== id));
+}
+
+const KAI_GOAL_CRUSHER_KEY = "kaiGoalCrusherBadge";
+
+/** Call when user marks a goal complete (badge + removal). */
+export function markGoalCompleted(id: string): void {
+  removeGoal(id);
+  if (typeof window !== "undefined") {
+    localStorage.setItem(KAI_GOAL_CRUSHER_KEY, "1");
+  }
 }

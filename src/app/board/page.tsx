@@ -99,10 +99,10 @@ export default function BoardPage() {
   return (
     <div className="flex min-h-screen flex-col bg-black">
       <Header />
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-6 max-md:pb-[calc(80px+env(safe-area-inset-bottom,0px))] max-md:text-[15px]">
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-0 max-md:pb-[calc(80px+env(safe-area-inset-bottom,0px))] max-md:text-[15px]">
         <HomeBackLink />
         <h1 className="kai-heading mb-2 text-xl font-semibold tracking-[0.05em]">
-          Team board
+          Team Board
         </h1>
 
         <section className="mb-10">
@@ -138,11 +138,17 @@ export default function BoardPage() {
                     {m.lastUpdate}
                   </div>
 
+                  <p className="mt-4 text-sm font-medium leading-snug text-[#C9A84C]/95">
+                    {m.firstName} has been stuck for {m.stuckDays}{" "}
+                    {m.stuckDays === 1 ? "day" : "days"}. If this was your
+                    company, would you ignore it?
+                  </p>
+
                   <Link
                     href="/chat?mode=stuck"
                     className="kai-btn kai-btn-shimmer kai-glow-active mt-4 flex w-full items-center justify-center rounded-xl border border-[rgba(201,168,76,0.35)] bg-black px-4 py-2.5 text-sm font-semibold text-[#F5F0E8]"
                   >
-                    Help {m.firstName} get unstuck
+                    Step in now
                   </Link>
                 </article>
               ))}

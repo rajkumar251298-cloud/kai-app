@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { DM_Sans, Playfair_Display } from "next/font/google";
 import { Suspense } from "react";
 import { AppChrome } from "@/components/AppChrome";
+import { DailyResetRunner } from "@/components/DailyResetRunner";
 import { AuthGate } from "@/components/AuthGate";
 import { AuthProvider } from "@/components/AuthProvider";
+import { OnboardingAuthSync } from "@/components/OnboardingAuthSync";
 import { SplashGate } from "@/components/SplashGate";
 import "./globals.css";
 
@@ -19,7 +21,10 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "KAI — Keep At It",
+  title: {
+    default: "Home (KAI)",
+    template: "%s — KAI",
+  },
   description: "Your personal accountability coach",
 };
 
@@ -42,10 +47,13 @@ export default function RootLayout({
           fallback={<div className="min-h-screen bg-black" aria-hidden />}
         >
           <SplashGate>
+            <DailyResetRunner />
             <AuthProvider>
-              <AuthGate>
-                <AppChrome>{children}</AppChrome>
-              </AuthGate>
+              <OnboardingAuthSync>
+                <AuthGate>
+                  <AppChrome>{children}</AppChrome>
+                </AuthGate>
+              </OnboardingAuthSync>
             </AuthProvider>
           </SplashGate>
         </Suspense>

@@ -2,46 +2,40 @@
 
 import { Header } from "@/components/Header";
 import { WelcomeSplash } from "@/components/WelcomeSplash";
+import { getStoredUserGoal } from "@/lib/kaiLocalProfile";
+import { writeKaiMemory } from "@/lib/kaiMemory";
+import {
+  getTodaysFocus,
+  type TodaysFocusResult,
+} from "@/lib/kaiTodaysFocus";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { KAI_HABIT_PROFILE_KEY } from "@/lib/kaiPoints";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 const MotionLink = motion.create(Link);
 
-const FOCUS_ITEMS = [
-  "Reach out to 2 potential users",
-  "Finalize onboarding UI",
-] as const;
-
 const MODE_CARD =
-  "kai-card kai-card-interactive kai-btn-shimmer block border border-[rgba(201,168,76,0.22)] bg-black p-4 text-left transition-[border-color,box-shadow] duration-[250ms] ease hover:border-[rgba(201,168,76,0.38)]";
+  "kai-card kai-card-interactive kai-btn-shimmer block border border-[rgba(201,168,76,0.22)] bg-black p-4 text-left transition-[border-color,box-shadow,transform] duration-[250ms] ease hover:border-[rgba(201,168,76,0.38)]";
 
-const MODES = [
-  {
-    href: "/chat?mode=checkin",
-    emoji: "☀️",
-    title: "Daily Check-in",
-    subtitle: "How's your day going?",
-  },
+const MORE_MODES = [
   {
     href: "/chat?mode=stuck",
     emoji: "🧠",
     title: "I'm Stuck",
-    subtitle: "Let's unblock you fast",
+    subtitle: "Unblock fast",
   },
   {
     href: "/chat?mode=plan",
     emoji: "🗺️",
     title: "Review My Plan",
-    subtitle: "Critique your week",
+    subtitle: "Gaps and risks",
   },
   {
     key: "brainstorm",
     emoji: "💡",
     title: "Brainstorm",
-    subtitle: "Generate options fast",
+    subtitle: "Generate options",
   },
 ] as const;
 
@@ -51,24 +45,24 @@ function greetingForTime(d: Date): { greeting: string; subtitle: string } {
   if (mins >= 5 * 60 && mins <= 11 * 60 + 59) {
     return {
       greeting: "Good morning",
-      subtitle: "Let's make today count.",
+      subtitle: "I'm watching. Make it count.",
     };
   }
   if (mins >= 12 * 60 && mins <= 16 * 60 + 59) {
     return {
       greeting: "Good afternoon",
-      subtitle: "How's the day going so far?",
+      subtitle: "Still on the hook for what you said.",
     };
   }
   if (mins >= 17 * 60 && mins <= 20 * 60 + 59) {
     return {
       greeting: "Good evening",
-      subtitle: "Evening check-in time.",
+      subtitle: "Don't drift — close the day honestly.",
     };
   }
   return {
     greeting: "Hey",
-    subtitle: "Still grinding? Respect.",
+    subtitle: "You're still up. So am I.",
   };
 }
 
@@ -80,7 +74,14 @@ export default function Home() {
   const [daySubtitle, setDaySubtitle] = useState("Let's make today count.");
   const [brainstormOpen, setBrainstormOpen] = useState(false);
   const [brainstormTopic, setBrainstormTopic] = useState("");
-  const [habitCoachLine, setHabitCoachLine] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [focusKey, setFocusKey] = useState(0);
+
+  const refreshFocus = useCallback(() => setFocusKey((k) => k + 1), []);
+
+  const [focus, setFocus] = useState<TodaysFocusResult>(() =>
+    getTodaysFocus(""),
+  );
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -90,21 +91,18 @@ export default function Home() {
         const { greeting, subtitle } = greetingForTime(new Date());
         setGreetingLine(`${greeting}, ${who}.`);
         setDaySubtitle(subtitle);
-        const raw = localStorage.getItem(KAI_HABIT_PROFILE_KEY);
-        if (raw) {
-          const p = JSON.parse(raw) as { title?: string };
-          if (p?.title) {
-            setHabitCoachLine(
-              `KAI has you down as ${p.title} — coaching is tuned to your patterns.`,
-            );
-          }
-        }
       } catch {
         setGreetingLine("Good morning, there.");
         setDaySubtitle("Let's make today count.");
       }
     });
   }, []);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setFocus(getTodaysFocus(getStoredUserGoal()));
+    });
+  }, [focusKey]);
 
   const openBrainstorm = () => {
     setBrainstormTopic("");
@@ -117,6 +115,16 @@ export default function Home() {
     if (!t) return;
     setBrainstormOpen(false);
     router.push(`/chat?mode=ideas&topic=${encodeURIComponent(t)}`);
+  };
+
+  const markYesterdayDone = () => {
+    writeKaiMemory({ lastCompleted: true });
+    refreshFocus();
+  };
+
+  const markYesterdayNotDone = () => {
+    writeKaiMemory({ lastCompleted: false });
+    router.push("/chat?mode=checkin");
   };
 
   return (
@@ -141,81 +149,56 @@ export default function Home() {
             {greetingLine}
           </h1>
           <p className="mt-2 text-sm text-[#E8DCC8]">{daySubtitle}</p>
-          {habitCoachLine && (
-            <p className="mt-3 text-sm leading-snug text-[#C9A84C]/85">
-              {habitCoachLine}
-            </p>
-          )}
-        </motion.div>
-
-        <motion.div
-          className="mb-8 mt-8 grid grid-cols-2 gap-3"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.08, ease: [0.33, 1, 0.68, 1] }}
-        >
-          {MODES.map((m) =>
-            "href" in m ? (
-              <MotionLink
-                key={m.title}
-                href={m.href}
-                className={MODE_CARD}
-                whileHover={{ y: -3 }}
-                transition={{ type: "spring", stiffness: 400, damping: 28 }}
-              >
-                <span className="text-2xl opacity-[0.72]">{m.emoji}</span>
-                <p className="kai-heading mt-2 text-sm font-semibold tracking-[0.05em]">
-                  {m.title}
-                </p>
-                <p className="mt-1 text-xs leading-snug text-[#E8DCC8]/75">
-                  {m.subtitle}
-                </p>
-              </MotionLink>
-            ) : (
-              <motion.button
-                key={m.key}
-                type="button"
-                onClick={openBrainstorm}
-                className={`${MODE_CARD} w-full text-left`}
-                whileHover={{ y: -3 }}
-                transition={{ type: "spring", stiffness: 400, damping: 28 }}
-              >
-                <span className="text-2xl">{m.emoji}</span>
-                <p className="kai-heading mt-2 text-sm font-semibold tracking-[0.05em]">
-                  {m.title}
-                </p>
-                <p className="mt-1 text-xs leading-snug text-[#E8DCC8]/75">
-                  {m.subtitle}
-                </p>
-              </motion.button>
-            ),
-          )}
         </motion.div>
 
         <motion.section
-          className="kai-card mt-8 p-6"
+          className="kai-card kai-glow-active mt-8 p-6"
+          key={`focus-${focusKey}`}
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.12, ease: [0.33, 1, 0.68, 1] }}
+          transition={{ duration: 0.45, delay: 0.06, ease: [0.33, 1, 0.68, 1] }}
         >
           <h2 className="kai-heading mb-4 text-lg font-semibold tracking-[0.05em]">
             Today&apos;s Focus
           </h2>
 
-          <ul className="space-y-3 text-sm leading-relaxed text-[#E8DCC8]">
-            {FOCUS_ITEMS.map((line) => (
-              <li key={line} className="flex items-start gap-2">
-                <span className="shrink-0 text-[#C9A84C]" aria-hidden>
-                  •
-                </span>
-                <span>{line}</span>
-              </li>
-            ))}
-          </ul>
+          {focus.blocked ? (
+            <div className="space-y-4 text-sm leading-relaxed text-[#E8DCC8]">
+              <p className="font-medium text-[#F5F0E8]">{focus.headline}</p>
+              <p>{focus.body}</p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={markYesterdayDone}
+                  className="kai-btn-shimmer rounded-xl border border-[rgba(201,168,76,0.4)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] px-4 py-2.5 text-sm font-semibold text-black/90"
+                >
+                  I finished it
+                </button>
+                <button
+                  type="button"
+                  onClick={markYesterdayNotDone}
+                  className="rounded-xl border border-[rgba(201,168,76,0.2)] bg-black px-4 py-2.5 text-sm font-medium text-[#E8DCC8] transition-colors hover:border-[rgba(201,168,76,0.35)]"
+                >
+                  I didn&apos;t — tell KAI
+                </button>
+              </div>
+            </div>
+          ) : (
+            <ul className="space-y-3 text-sm leading-relaxed text-[#E8DCC8]">
+              {focus.tasks.map((line) => (
+                <li key={line} className="flex items-start gap-2">
+                  <span className="shrink-0 text-[#C9A84C]" aria-hidden>
+                    •
+                  </span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          )}
 
           <MotionLink
             href="/chat?mode=checkin"
-            className="kai-btn kai-btn-shimmer relative mt-6 flex w-full items-center justify-center rounded-xl border border-[rgba(201,168,76,0.38)] bg-black py-3 text-[15px] font-medium text-[#F5F0E8]"
+            className="kai-btn kai-btn-shimmer kai-glow-active relative mt-6 flex w-full items-center justify-center rounded-xl border border-[rgba(201,168,76,0.38)] bg-black py-3 text-[15px] font-medium text-[#F5F0E8]"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             transition={{ type: "spring", stiffness: 520, damping: 32 }}
@@ -224,32 +207,89 @@ export default function Home() {
           </MotionLink>
         </motion.section>
 
-        <motion.nav
-          className="mt-10 flex flex-wrap justify-center gap-x-8 gap-y-2 text-xs text-[#E8DCC8]/55"
+        <motion.div
+          className="mt-8"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.35, delay: 0.28, ease: [0.33, 1, 0.68, 1] }}
-          aria-label="More actions"
+          transition={{ duration: 0.35, delay: 0.12 }}
         >
-          <Link
-            href="/chat?mode=plan"
-            className="transition-colors hover:text-[#C9A84C]"
+          <button
+            type="button"
+            onClick={() => setMoreOpen((o) => !o)}
+            className="flex w-full items-center justify-between rounded-xl border border-[rgba(201,168,76,0.15)] bg-[#111111] px-4 py-3 text-left text-sm font-medium text-[#E8DCC8] transition-[border-color,transform] duration-200 hover:border-[rgba(201,168,76,0.28)]"
+            aria-expanded={moreOpen}
           >
-            Review plan
-          </Link>
-          <Link
-            href="/dashboard"
-            className="transition-colors hover:text-[#C9A84C]"
+            <span>More</span>
+            <span className="text-[#C9A84C]" aria-hidden>
+              {moreOpen ? "−" : "+"}
+            </span>
+          </button>
+
+          {moreOpen && (
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {MORE_MODES.map((m) =>
+                "href" in m ? (
+                  <MotionLink
+                    key={m.title}
+                    href={m.href}
+                    className={MODE_CARD}
+                    whileHover={{ y: -4 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 28 }}
+                  >
+                    <span className="text-2xl opacity-[0.72]">{m.emoji}</span>
+                    <p className="kai-heading mt-2 text-sm font-semibold tracking-[0.05em]">
+                      {m.title}
+                    </p>
+                    <p className="mt-1 text-xs leading-snug text-[#E8DCC8]/75">
+                      {m.subtitle}
+                    </p>
+                  </MotionLink>
+                ) : (
+                  <motion.button
+                    key={m.key}
+                    type="button"
+                    onClick={openBrainstorm}
+                    className={`${MODE_CARD} w-full text-left`}
+                    whileHover={{ y: -4 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 28 }}
+                  >
+                    <span className="text-2xl">{m.emoji}</span>
+                    <p className="kai-heading mt-2 text-sm font-semibold tracking-[0.05em]">
+                      {m.title}
+                    </p>
+                    <p className="mt-1 text-xs leading-snug text-[#E8DCC8]/75">
+                      {m.subtitle}
+                    </p>
+                  </motion.button>
+                ),
+              )}
+            </div>
+          )}
+
+          <nav
+            className="mt-6 flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs font-medium md:hidden"
+            aria-label="More actions"
           >
-            Dashboard
-          </Link>
-          <Link
-            href="/board"
-            className="transition-colors hover:text-[#C9A84C]"
-          >
-            Team board
-          </Link>
-        </motion.nav>
+            <Link
+              href="/dashboard"
+              className="text-white/50 transition-colors duration-200 hover:text-[#C9A84C]/80"
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/board"
+              className="text-white/50 transition-colors duration-200 hover:text-[#C9A84C]/80"
+            >
+              Team Board
+            </Link>
+            <Link
+              href="/profile"
+              className="text-white/50 transition-colors duration-200 hover:text-[#C9A84C]/80"
+            >
+              Profile
+            </Link>
+          </nav>
+        </motion.div>
       </main>
 
       {brainstormOpen && (
