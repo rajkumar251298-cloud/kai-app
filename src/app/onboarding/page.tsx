@@ -5,11 +5,14 @@ import {
   KAI_LS_CHECK_IN_TIME,
   KAI_LS_USER_GOAL,
   KAI_LS_USER_NAME,
+  getStoredUserName,
+  setStoredCheckInTime,
+  setStoredUserName,
 } from "@/lib/kaiLocalProfile";
 import { addUserGoal } from "@/lib/goalSystem";
 import {
-  LS_USER_AGE_GROUP,
-  LS_USER_GOAL_TYPE,
+  setStoredUserAgeGroup,
+  setStoredUserGoalType,
 } from "@/lib/kaiPersona";
 import Link from "next/link";
 import {
@@ -219,7 +222,7 @@ export default function OnboardingPage() {
       });
       pushUser(text);
       if (typeof window !== "undefined") {
-        localStorage.setItem(STORAGE_KEYS.userName, text);
+        setStoredUserName(text);
       }
       setUserFirstName(text);
       setPhase("wait_self_pick");
@@ -233,7 +236,6 @@ export default function OnboardingPage() {
       setInput("");
       pushUser(text);
       if (typeof window !== "undefined") {
-        localStorage.setItem(STORAGE_KEYS.userGoal, text);
         localStorage.removeItem("mainGoal");
         const d = new Date();
         d.setDate(d.getDate() + 90);
@@ -293,14 +295,12 @@ export default function OnboardingPage() {
     if (isKaiTyping || phase !== "wait_time") return;
     pushUser(timeLabel);
     if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEYS.checkInTime, timeLabel);
+      setStoredCheckInTime(timeLabel);
       localStorage.removeItem("checkinTime");
     }
     const name =
       userFirstName.trim() ||
-      (typeof window !== "undefined"
-        ? localStorage.getItem(STORAGE_KEYS.userName)?.trim() || "friend"
-        : "friend");
+      (typeof window !== "undefined" ? getStoredUserName() || "friend" : "friend");
     await pushKai(msg9(timeLabel, name));
     setPhase("done");
   };
@@ -309,8 +309,8 @@ export default function OnboardingPage() {
     if (phase !== "wait_self_pick" || isKaiTyping) return;
     pushUser(`${opt.emoji} ${opt.label}`);
     if (typeof window !== "undefined") {
-      localStorage.setItem(LS_USER_AGE_GROUP, opt.age);
-      localStorage.setItem(LS_USER_GOAL_TYPE, opt.goalType);
+      setStoredUserAgeGroup(opt.age);
+      setStoredUserGoalType(opt.goalType);
     }
     setPhase("wait_goal_text");
     await pushKai(MSG_5_BY_SELF[opt.id]);

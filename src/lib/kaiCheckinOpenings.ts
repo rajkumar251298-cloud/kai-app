@@ -2,6 +2,7 @@
  * Warm daily check-in openings — one random line per calendar day (localStorage).
  */
 
+import { getStoredUserName } from "@/lib/kaiLocalProfile";
 import { todayKey } from "@/lib/kaiPoints";
 
 const LS_MESSAGE = "todayOpeningMessage";
@@ -9,7 +10,7 @@ const LS_DATE = "todayOpeningMessageDate";
 
 function displayName(): string {
   if (typeof window === "undefined") return "there";
-  const n = localStorage.getItem("userName")?.trim();
+  const n = getStoredUserName();
   return n || "there";
 }
 

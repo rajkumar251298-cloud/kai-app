@@ -1,5 +1,6 @@
 "use client";
 
+import { getStoredUserName } from "@/lib/kaiLocalProfile";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -12,7 +13,7 @@ function safeNextPath(raw: string | null): string {
 }
 
 function postLoginRoute(): string {
-  const hasName = localStorage.getItem("userName")?.trim();
+  const hasName = getStoredUserName()?.trim();
   return hasName ? "/" : "/onboarding";
 }
 

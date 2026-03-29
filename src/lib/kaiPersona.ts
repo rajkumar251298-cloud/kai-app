@@ -1,4 +1,6 @@
+import { getStoredUserName } from "@/lib/kaiLocalProfile";
 import { getDisplayedStreak, ensureStreakProcessed } from "@/lib/streakSystem";
+import { secureStorage } from "@/lib/secureStorage";
 
 export const LS_USER_AGE_GROUP = "userAgeGroup";
 export const LS_USER_GOAL_TYPE = "userGoalType";
@@ -17,9 +19,17 @@ export type UserGoalType =
   | "startup"
   | "";
 
+export function setStoredUserAgeGroup(value: string): void {
+  secureStorage.set(LS_USER_AGE_GROUP, value);
+}
+
+export function setStoredUserGoalType(value: string): void {
+  secureStorage.set(LS_USER_GOAL_TYPE, value);
+}
+
 export function readUserAgeGroup(): UserAgeGroup {
   if (typeof window === "undefined") return "";
-  const v = localStorage.getItem(LS_USER_AGE_GROUP)?.trim() ?? "";
+  const v = secureStorage.get(LS_USER_AGE_GROUP)?.trim() ?? "";
   if (
     v === "student" ||
     v === "early_career" ||
@@ -33,7 +43,7 @@ export function readUserAgeGroup(): UserAgeGroup {
 
 export function readUserGoalType(): UserGoalType {
   if (typeof window === "undefined") return "";
-  const v = localStorage.getItem(LS_USER_GOAL_TYPE)?.trim() ?? "";
+  const v = secureStorage.get(LS_USER_GOAL_TYPE)?.trim() ?? "";
   if (v === "study" || v === "career" || v === "health" || v === "startup") {
     return v;
   }
@@ -139,6 +149,6 @@ export function stuckOpeningForPersona(): string {
   if (typeof window === "undefined") {
     return "I'm glad you're here. What's feeling stuck — in your own words?";
   }
-  const name = localStorage.getItem("userName")?.trim() || "there";
+  const name = getStoredUserName() || "there";
   return `${name}, I'm really glad you came here. What's feeling stuck right now — in plain words?`;
 }

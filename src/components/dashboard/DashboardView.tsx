@@ -16,6 +16,7 @@ import {
   type UserGoal,
 } from "@/lib/goalSystem";
 import { getTotalPoints, todayKeyLocal } from "@/lib/kaiPoints";
+import { getStoredUserName } from "@/lib/kaiLocalProfile";
 import {
   getDisplayedStreak,
   getLongestStreak,
@@ -61,8 +62,6 @@ function parseGameParam(
   return null;
 }
 
-const LS_USER = "userName";
-
 export function DashboardView() {
   const router = useRouter();
   const { session, loading: authLoading, isConfigured } = useAuth();
@@ -88,7 +87,7 @@ export function DashboardView() {
 
   useEffect(() => {
     const read = () =>
-      setLocalUserName(localStorage.getItem(LS_USER)?.trim() || null);
+      setLocalUserName(getStoredUserName() || null);
     queueMicrotask(read);
     window.addEventListener("storage", read);
     window.addEventListener("focus", read);

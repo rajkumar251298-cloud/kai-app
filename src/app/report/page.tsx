@@ -3,7 +3,7 @@
 import { Header } from "@/components/Header";
 import { RouterBackButton } from "@/components/RouterBackButton";
 import { memoryForApi, stripKaiMachineLines } from "@/lib/kaiMemory";
-import { KAI_LS_USER_NAME, getStoredUserGoal } from "@/lib/kaiLocalProfile";
+import { getStoredUserGoal, getStoredUserName } from "@/lib/kaiLocalProfile";
 import {
   GRADE_COPY,
   computeWeeklyReport,
@@ -27,9 +27,7 @@ export default function WeeklyReportPage() {
   useEffect(() => {
     let cancelled = false;
     const userName =
-      typeof window !== "undefined"
-        ? localStorage.getItem(KAI_LS_USER_NAME)?.trim() || "there"
-        : "there";
+      typeof window !== "undefined" ? getStoredUserName() || "there" : "there";
     const userGoal = typeof window !== "undefined" ? getStoredUserGoal() : "";
     const prompt = `Generate a personal weekly performance review for ${userName}. They completed ${snapshot.checkins} check-ins out of 7 this week, maintained a ${snapshot.streak} day streak, played ${snapshot.gamesPlayed} games, and earned ${snapshot.pointsEarned} points. Write 3-4 sentences as KAI the accountability coach. Be honest, specific, warm but direct. Reference their actual numbers. End with one sharp challenge for next week.`;
 

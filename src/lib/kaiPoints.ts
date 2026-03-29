@@ -1,5 +1,6 @@
 /** Streak points — localStorage (client-only). */
 
+import { secureStorage } from "@/lib/secureStorage";
 import {
   addLocalDays,
   ensureStreakProcessed,
@@ -141,7 +142,7 @@ export function getLast7DaysCheckinFlags(): boolean[] {
 
 export function habitQuizProfileSaved(): boolean {
   if (typeof window === "undefined") return false;
-  return Boolean(localStorage.getItem(KAI_HABIT_PROFILE_KEY)?.trim());
+  return Boolean(secureStorage.get(KAI_HABIT_PROFILE_KEY)?.trim());
 }
 
 export function addPoints(amount: number): number {

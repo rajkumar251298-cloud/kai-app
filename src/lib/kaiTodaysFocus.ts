@@ -1,5 +1,6 @@
 import { readKaiMemory, type KaiMemory } from "@/lib/kaiMemory";
 import { todayKey } from "@/lib/kaiPoints";
+import { getStoredUserName } from "@/lib/kaiLocalProfile";
 import { getWarmDailyCheckinOpening } from "@/lib/kaiCheckinOpenings";
 import {
   checkinDefaultOpening,
@@ -10,7 +11,7 @@ export const DEFAULT_CHECKIN_OPENING = checkinDefaultOpening();
 
 function displayNameForOpening(): string {
   if (typeof window === "undefined") return "there";
-  return localStorage.getItem("userName")?.trim() || "there";
+  return getStoredUserName() || "there";
 }
 
 /** Unfinished commitment from a prior calendar day (or explicit not-done). */

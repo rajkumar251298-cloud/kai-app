@@ -1,4 +1,4 @@
-import { getStoredCheckInTime } from "@/lib/kaiLocalProfile";
+import { getStoredCheckInTime, getStoredUserName } from "@/lib/kaiLocalProfile";
 import {
   getConsecutiveCheckinStreak,
   hasCheckinToday,
@@ -151,7 +151,7 @@ export function scheduleNotifications(): void {
   if (typeof window === "undefined") return;
   if (!remindersEnabled() || !permissionOk()) return;
 
-  const name = localStorage.getItem("userName")?.trim() || "there";
+  const name = getStoredUserName() || "there";
   const streak = getConsecutiveCheckinStreak();
   const now = new Date();
   const checkMin = parseDailyTimeToMinutes();

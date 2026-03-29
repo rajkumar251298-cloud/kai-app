@@ -1,7 +1,7 @@
 import {
-  KAI_LS_USER_NAME,
   getStoredCheckInTime,
   getStoredUserGoal,
+  getStoredUserName,
 } from "@/lib/kaiLocalProfile";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
@@ -54,7 +54,7 @@ export async function syncUserProfileToSupabase(
       return;
     }
 
-    const name = localStorage.getItem(KAI_LS_USER_NAME);
+    const name = getStoredUserName();
     const goal = getStoredUserGoal();
     const time = getStoredCheckInTime();
 

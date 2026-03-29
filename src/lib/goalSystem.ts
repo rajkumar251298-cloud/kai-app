@@ -3,8 +3,12 @@
  */
 
 import { addPoints } from "@/lib/kaiPoints";
+import { secureStorage } from "@/lib/secureStorage";
 
 export const USER_GOALS_LS_KEY = "userGoals";
+
+/** Flat mirror key — must match KAI_LS_USER_GOAL in kaiLocalProfile. */
+const LS_FLAT_USER_GOAL = "userGoal";
 
 export type GoalMilestone = { text: string; done: boolean };
 
@@ -237,7 +241,7 @@ export function syncLegacyUserGoalToUserGoals(): void {
   if (typeof window === "undefined") return;
   if (localStorage.getItem(USER_GOALS_LS_KEY)) return;
   const legacy =
-    localStorage.getItem("userGoal")?.trim() ||
+    secureStorage.get(LS_FLAT_USER_GOAL).trim() ||
     localStorage.getItem("mainGoal")?.trim();
   if (!legacy) return;
   const d = new Date();

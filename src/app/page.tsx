@@ -3,7 +3,7 @@
 import { useAuth } from "@/components/AuthProvider";
 import { Header } from "@/components/Header";
 import { WelcomeSplash } from "@/components/WelcomeSplash";
-import { getStoredUserGoal } from "@/lib/kaiLocalProfile";
+import { getStoredUserGoal, getStoredUserName } from "@/lib/kaiLocalProfile";
 import { writeKaiMemory } from "@/lib/kaiMemory";
 import {
   getTodaysFocus,
@@ -88,7 +88,7 @@ export default function Home() {
     try {
       ensureStreakProcessed();
       const google = user ? greetWhoFromGoogle(user.user_metadata) : null;
-      const stored = localStorage.getItem("userName")?.trim();
+      const stored = getStoredUserName();
       const who =
         google && google.length > 0
           ? google

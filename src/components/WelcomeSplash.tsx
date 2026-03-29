@@ -1,5 +1,6 @@
 "use client";
 
+import { getStoredUserName } from "@/lib/kaiLocalProfile";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
 
@@ -56,7 +57,7 @@ export function WelcomeSplash({ onComplete }: Props) {
   useEffect(() => {
     queueMicrotask(() => {
       const d = new Date();
-      const raw = localStorage.getItem("userName")?.trim();
+      const raw = getStoredUserName()?.trim();
       const c = splashCopy(d);
       setLines({
         greeting: c.greeting,

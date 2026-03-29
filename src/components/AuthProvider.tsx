@@ -1,6 +1,7 @@
 "use client";
 
 import { safeNextPath } from "@/lib/authPaths";
+import { getStoredUserName } from "@/lib/kaiLocalProfile";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { syncUserProfileToSupabase } from "@/lib/syncUserProfileToSupabase";
 import type { Session, User } from "@supabase/supabase-js";
@@ -72,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         `${url.pathname}${qs ? `?${qs}` : ""}${url.hash}`,
       );
 
-      const hasName = localStorage.getItem("userName")?.trim();
+      const hasName = getStoredUserName()?.trim();
       const next = safeNextPath(sessionStorage.getItem("kaiAuthNext"));
       sessionStorage.removeItem("kaiAuthNext");
       router.replace(hasName ? next : "/onboarding");

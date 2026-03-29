@@ -1,6 +1,7 @@
 "use client";
 
 import { safeNextPath } from "@/lib/authPaths";
+import { getStoredUserName } from "@/lib/kaiLocalProfile";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { syncUserProfileToSupabase } from "@/lib/syncUserProfileToSupabase";
 import { useRouter } from "next/navigation";
@@ -41,7 +42,7 @@ export default function AuthCallbackPage() {
 
       // Keep userName / userGoal / checkInTime in localStorage — KAI reads them on home, chat, profile.
 
-      const hasName = localStorage.getItem("userName")?.trim();
+      const hasName = getStoredUserName()?.trim();
       const next = safeNextPath(sessionStorage.getItem("kaiAuthNext"));
       sessionStorage.removeItem("kaiAuthNext");
       router.replace(hasName ? next : "/onboarding");

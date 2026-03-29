@@ -3,9 +3,13 @@
 import { DAILY_REFLECTION_QUESTIONS } from "@/data/dailyReflection";
 import { dayOfYearLocal } from "@/lib/dayOfYear";
 import {
+  getStoredHabitProfile,
+  removeStoredHabitProfile,
+  setStoredHabitProfile,
+} from "@/lib/kaiLocalProfile";
+import {
   addPoints,
   habitQuizPointsAlreadyAwarded,
-  KAI_HABIT_PROFILE_KEY,
   markHabitQuizPointsAwarded,
   todayKey,
   tryAwardDailyReflectionPoints,
@@ -109,7 +113,7 @@ function reflectionStorageKey(): string {
 function loadSavedProfile(): SavedHabitProfile | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(KAI_HABIT_PROFILE_KEY);
+    const raw = getStoredHabitProfile();
     if (!raw) return null;
     const o = JSON.parse(raw) as Record<string, unknown>;
     if (
@@ -381,7 +385,7 @@ export function HabitQuizTab({ onPoints }: Props) {
       answers,
       insights,
     };
-    localStorage.setItem(KAI_HABIT_PROFILE_KEY, JSON.stringify(payload));
+    setStoredHabitProfile(JSON.stringify(payload));
     if (!habitQuizPointsAlreadyAwarded()) {
       markHabitQuizPointsAwarded();
       addPoints(50);
@@ -393,7 +397,7 @@ export function HabitQuizTab({ onPoints }: Props) {
   }, [arch, answers, insights, onPoints]);
 
   const startRetake = () => {
-    localStorage.removeItem(KAI_HABIT_PROFILE_KEY);
+    removeStoredHabitProfile();
     setSavedProfile(null);
     setRetaking(true);
     setIdx(0);

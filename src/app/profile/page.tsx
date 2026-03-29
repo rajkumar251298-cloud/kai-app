@@ -19,6 +19,10 @@ import {
   KAI_LS_CHECK_IN_TIME,
   KAI_LS_USER_NAME,
   getStoredCheckInTime,
+  getStoredHabitProfile,
+  getStoredUserName,
+  setStoredCheckInTime,
+  setStoredUserName,
 } from "@/lib/kaiLocalProfile";
 import {
   getConsecutiveCheckinStreak,
@@ -26,7 +30,6 @@ import {
   getTotalCheckins,
   getTotalPoints,
   habitQuizProfileSaved,
-  KAI_HABIT_PROFILE_KEY,
 } from "@/lib/kaiPoints";
 import { getLongestStreak, ensureStreakProcessed } from "@/lib/streakSystem";
 import {
@@ -129,9 +132,9 @@ export default function ProfilePage() {
     ensureStreakProcessed();
     setStreakUi(getConsecutiveCheckinStreak());
     setLongestUi(getLongestStreak());
-    setUserName(localStorage.getItem(K_USER)?.trim() || null);
+    setUserName(getStoredUserName() || null);
     try {
-      const raw = localStorage.getItem(KAI_HABIT_PROFILE_KEY);
+      const raw = getStoredHabitProfile();
       if (raw) {
         const p = JSON.parse(raw) as { title?: string };
         setHabitTitle(p?.title ?? null);
@@ -235,7 +238,7 @@ export default function ProfilePage() {
       setNameEditing(false);
       return;
     }
-    localStorage.setItem(K_USER, t);
+    setStoredUserName(t);
     setUserName(t);
     if (user && isSupabaseConfigured) {
       try {
@@ -259,7 +262,7 @@ export default function ProfilePage() {
     e.preventDefault();
     const t = timeDraft.trim();
     if (t) {
-      localStorage.setItem(KAI_LS_CHECK_IN_TIME, t);
+      setStoredCheckInTime(t);
       localStorage.removeItem("checkinTime");
     }
     setTimeModal(false);

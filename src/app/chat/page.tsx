@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  KAI_LS_USER_NAME,
   getStoredUserGoal,
+  getStoredUserName,
 } from "@/lib/kaiLocalProfile";
 import {
   buildCheckinOpening,
@@ -50,10 +50,6 @@ type ChatMessage = {
   role: "kai" | "user";
   content: string;
 };
-
-const STORAGE_KEYS = {
-  userName: KAI_LS_USER_NAME,
-} as const;
 
 const OPENINGS: Record<ChatMode, string> = {
   checkin: "",
@@ -313,9 +309,7 @@ function ChatInner() {
     }
 
     const userName =
-      typeof window !== "undefined"
-        ? localStorage.getItem(STORAGE_KEYS.userName) ?? ""
-        : "";
+      typeof window !== "undefined" ? getStoredUserName() : "";
     const userGoal =
       typeof window !== "undefined" ? getStoredUserGoal() : "";
     const userAgeGroup =
