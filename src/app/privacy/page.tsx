@@ -14,7 +14,9 @@ export default function PrivacyPage() {
         <h1 className="kai-heading mt-4 text-3xl font-semibold tracking-[0.04em] text-[#F5F0E8] sm:text-4xl">
           Privacy Policy
         </h1>
-        <p className="mt-2 text-sm text-[#C9A84C]/85">Last updated: March 2026</p>
+        <p className="mt-2 text-sm text-[#C9A84C]/85">
+          Last updated: March 29, 2026
+        </p>
 
         <div className="mt-8 space-y-10">
           <section className="rounded-2xl border border-[rgba(201,168,76,0.18)] bg-[#111111] p-5 shadow-[0_10px_30px_rgba(0,0,0,0.55)] sm:p-6">
@@ -67,6 +69,31 @@ export default function PrivacyPage() {
                 responses. These are not stored permanently beyond your active
                 session unless you explicitly save them.
               </li>
+              <li>
+                <span className="font-medium text-[#E8DCC8]">Game data:</span>{" "}
+                Your daily puzzle completions, memory card scores, logic puzzle
+                results, and habit quiz responses
+              </li>
+              <li>
+                <span className="font-medium text-[#E8DCC8]">
+                  Level and badge data:
+                </span>{" "}
+                Your KAI level, earned badges, and streak points
+              </li>
+              <li>
+                <span className="font-medium text-[#E8DCC8]">
+                  Notification preferences:
+                </span>{" "}
+                Whether you have enabled smart nudges and your preferred
+                check-in time
+              </li>
+              <li>
+                <span className="font-medium text-[#E8DCC8]">
+                  Age group and goal type:
+                </span>{" "}
+                Your selected user category and primary goal focus area to
+                personalise your KAI experience
+              </li>
             </ul>
           </section>
 
@@ -94,6 +121,19 @@ export default function PrivacyPage() {
                 employers
               </li>
             </ul>
+          </section>
+
+          <section className="rounded-2xl border border-[rgba(201,168,76,0.18)] bg-[#111111] p-5 shadow-[0_10px_30px_rgba(0,0,0,0.55)] sm:p-6">
+            <h2 className={sectionTitle}>SECTION 4A — Games and Quiz Data</h2>
+            <p className={body}>
+              Your game scores, habit quiz responses, and daily reflection
+              answers are stored locally on your device using browser
+              localStorage. This data is not transmitted to our servers unless
+              you are signed in with Google, in which case it may be synced to
+              your account for backup purposes. You can clear this data at any
+              time by clearing your browser&apos;s local storage or by deleting
+              your account.
+            </p>
           </section>
 
           <section className="rounded-2xl border border-[rgba(201,168,76,0.18)] bg-[#111111] p-5 shadow-[0_10px_30px_rgba(0,0,0,0.55)] sm:p-6">
@@ -186,9 +226,10 @@ export default function PrivacyPage() {
           <section className="rounded-2xl border border-[rgba(201,168,76,0.18)] bg-[#111111] p-5 shadow-[0_10px_30px_rgba(0,0,0,0.55)] sm:p-6">
             <h2 className={sectionTitle}>SECTION 7 — Children&apos;s Privacy</h2>
             <p className={body}>
-              KAI is intended for users aged 16 and above. We do not knowingly
-              collect data from children under 16. If you believe a child has
-              provided us with personal information please contact us immediately.
+              KAI welcomes users from age 16 and above. For users aged 16-18, we
+              recommend parental awareness of the app&apos;s goal-tracking and AI
+              coaching features. KAI does not knowingly collect data from users
+              under 16.
             </p>
           </section>
 
@@ -214,6 +255,17 @@ export default function PrivacyPage() {
                 className="font-medium text-[#C9A84C] underline hover:text-[#F5E6B3]"
               >
                 contactkai26@gmail.com
+              </a>
+            </p>
+            <p className={`${body} mt-2`}>
+              App:{" "}
+              <a
+                href="https://kai-app-beige.vercel.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-[#C9A84C] underline hover:text-[#F5E6B3]"
+              >
+                kai-app-beige.vercel.app
               </a>
             </p>
             <p className={`${body} mt-2`}>Response time: Within 48 hours</p>

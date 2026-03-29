@@ -1,17 +1,18 @@
 "use client";
 
+import { useAuth } from "@/components/AuthProvider";
 import { Header } from "@/components/Header";
 import { WelcomeSplash } from "@/components/WelcomeSplash";
 import { getStoredUserGoal } from "@/lib/kaiLocalProfile";
 import { writeKaiMemory } from "@/lib/kaiMemory";
 import {
-  homeGreetingSubtitle,
-  personaFocusSubtitle,
-} from "@/lib/kaiPersona";
-import {
   getTodaysFocus,
   type TodaysFocusResult,
 } from "@/lib/kaiTodaysFocus";
+import {
+  ensureStreakProcessed,
+  getDisplayedStreak,
+} from "@/lib/streakSystem";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -22,26 +23,22 @@ const MotionLink = motion.create(Link);
 const MODE_CARD =
   "kai-card kai-card-interactive kai-btn-shimmer block border border-[rgba(201,168,76,0.22)] bg-black p-4 text-left transition-[border-color,box-shadow,transform] duration-[250ms] ease hover:border-[rgba(201,168,76,0.38)]";
 
-const MORE_MODES = [
-  {
-    href: "/chat?mode=stuck",
-    emoji: "🧠",
-    title: "I'm Stuck",
-    subtitle: "Unblock fast",
-  },
-  {
-    href: "/chat?mode=plan",
-    emoji: "🗺️",
-    title: "Review My Plan",
-    subtitle: "Gaps and risks",
-  },
-  {
-    key: "brainstorm",
-    emoji: "💡",
-    title: "Brainstorm",
-    subtitle: "Generate options",
-  },
-] as const;
+function greetWhoFromGoogle(metadata: unknown): string | null {
+  if (!metadata || typeof metadata !== "object") return null;
+  const m = metadata as Record<string, unknown>;
+  for (const k of ["full_name", "name"] as const) {
+    const v = m[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return null;
+}
+
+function streakSubtitle(n: number): string {
+  if (n <= 0) return "Let's start your streak today.";
+  if (n >= 30) return `${n} days. You're in rare company.`;
+  if (n >= 7) return `${n} days strong. Don't stop now.`;
+  return `Day ${n} streak. Keep it going.`;
+}
 
 /** Device-local time: morning 5:00–11:59, afternoon 12:00–16:59, evening 17:00–20:59, night otherwise. */
 function greetingForTime(d: Date): { greeting: string; subtitle: string } {
@@ -72,14 +69,13 @@ function greetingForTime(d: Date): { greeting: string; subtitle: string } {
 
 export default function Home() {
   const router = useRouter();
+  const { user } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
   const onSplashComplete = useCallback(() => setShowSplash(false), []);
   const [greetingLine, setGreetingLine] = useState("Good morning, there.");
-  const [daySubtitle, setDaySubtitle] = useState("Entrepreneur · 0 day streak 🔥");
-  const [personaLine, setPersonaLine] = useState("Let's make today count.");
+  const [streakN, setStreakN] = useState(0);
   const [brainstormOpen, setBrainstormOpen] = useState(false);
   const [brainstormTopic, setBrainstormTopic] = useState("");
-  const [moreOpen, setMoreOpen] = useState(false);
   const [focusKey, setFocusKey] = useState(0);
 
   const refreshFocus = useCallback(() => setFocusKey((k) => k + 1), []);
@@ -90,18 +86,23 @@ export default function Home() {
 
   const refreshGreeting = useCallback(() => {
     try {
+      ensureStreakProcessed();
+      const google = user ? greetWhoFromGoogle(user.user_metadata) : null;
       const stored = localStorage.getItem("userName")?.trim();
-      const who = stored && stored.length > 0 ? stored : "there";
+      const who =
+        google && google.length > 0
+          ? google
+          : stored && stored.length > 0
+            ? stored
+            : "there";
       const { greeting } = greetingForTime(new Date());
       setGreetingLine(`${greeting}, ${who}.`);
-      setDaySubtitle(homeGreetingSubtitle());
-      setPersonaLine(personaFocusSubtitle());
+      setStreakN(getDisplayedStreak());
     } catch {
       setGreetingLine("Good morning, there.");
-      setDaySubtitle(homeGreetingSubtitle());
-      setPersonaLine(personaFocusSubtitle());
+      setStreakN(0);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     queueMicrotask(refreshGreeting);
@@ -159,13 +160,12 @@ export default function Home() {
           transition={{ duration: 0.45, ease: [0.33, 1, 0.68, 1] }}
         >
           <h1
-            className="kai-heading text-2xl font-semibold leading-tight tracking-[0.05em] sm:text-3xl"
+            className="kai-heading kai-plain-display text-2xl font-semibold leading-tight tracking-[0.05em] sm:text-3xl"
             suppressHydrationWarning
           >
             {greetingLine}
           </h1>
-          <p className="mt-2 text-sm text-[#E8DCC8]">{daySubtitle}</p>
-          <p className="mt-1 text-xs text-[#E8DCC8]/60">{personaLine}</p>
+          <p className="mt-2 text-sm text-[#E8DCC8]">{streakSubtitle(streakN)}</p>
         </motion.div>
 
         <motion.section
@@ -225,87 +225,76 @@ export default function Home() {
         </motion.section>
 
         <motion.div
-          className="mt-8"
+          className="mt-8 grid grid-cols-2 gap-3"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.35, delay: 0.12 }}
         >
-          <button
-            type="button"
-            onClick={() => setMoreOpen((o) => !o)}
-            className="flex w-full items-center justify-between rounded-xl border border-[rgba(201,168,76,0.15)] bg-[#111111] px-4 py-3 text-left text-sm font-medium text-[#E8DCC8] transition-[border-color,transform] duration-200 hover:border-[rgba(201,168,76,0.28)]"
-            aria-expanded={moreOpen}
+          <MotionLink
+            href="/chat?mode=checkin"
+            className={MODE_CARD}
+            whileHover={{ y: -4 }}
+            transition={{ type: "spring", stiffness: 400, damping: 28 }}
           >
-            <span>More</span>
-            <span className="text-[#C9A84C]" aria-hidden>
-              {moreOpen ? "−" : "+"}
+            <span className="text-2xl opacity-[0.72]" aria-hidden>
+              ☀️
             </span>
-          </button>
-
-          {moreOpen && (
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              {MORE_MODES.map((m) =>
-                "href" in m ? (
-                  <MotionLink
-                    key={m.title}
-                    href={m.href}
-                    className={MODE_CARD}
-                    whileHover={{ y: -4 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 28 }}
-                  >
-                    <span className="text-2xl opacity-[0.72]">{m.emoji}</span>
-                    <p className="kai-heading mt-2 text-sm font-semibold tracking-[0.05em]">
-                      {m.title}
-                    </p>
-                    <p className="mt-1 text-xs leading-snug text-[#E8DCC8]/75">
-                      {m.subtitle}
-                    </p>
-                  </MotionLink>
-                ) : (
-                  <motion.button
-                    key={m.key}
-                    type="button"
-                    onClick={openBrainstorm}
-                    className={`${MODE_CARD} w-full text-left`}
-                    whileHover={{ y: -4 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 28 }}
-                  >
-                    <span className="text-2xl">{m.emoji}</span>
-                    <p className="kai-heading mt-2 text-sm font-semibold tracking-[0.05em]">
-                      {m.title}
-                    </p>
-                    <p className="mt-1 text-xs leading-snug text-[#E8DCC8]/75">
-                      {m.subtitle}
-                    </p>
-                  </motion.button>
-                ),
-              )}
-            </div>
-          )}
-
-          <nav
-            className="mt-6 flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs font-medium md:hidden"
-            aria-label="More actions"
+            <p className="kai-heading mt-2 text-sm font-semibold tracking-[0.05em]">
+              Daily Check-in
+            </p>
+            <p className="mt-1 text-xs leading-snug text-[#E8DCC8]/75">
+              Start your day with KAI
+            </p>
+          </MotionLink>
+          <MotionLink
+            href="/chat?mode=stuck"
+            className={MODE_CARD}
+            whileHover={{ y: -4 }}
+            transition={{ type: "spring", stiffness: 400, damping: 28 }}
           >
-            <Link
-              href="/dashboard"
-              className="text-white/50 transition-colors duration-200 hover:text-[#C9A84C]/80"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/board"
-              className="text-white/50 transition-colors duration-200 hover:text-[#C9A84C]/80"
-            >
-              Team Board
-            </Link>
-            <Link
-              href="/profile"
-              className="text-white/50 transition-colors duration-200 hover:text-[#C9A84C]/80"
-            >
-              Profile
-            </Link>
-          </nav>
+            <span className="text-2xl opacity-[0.72]" aria-hidden>
+              🧠
+            </span>
+            <p className="kai-heading mt-2 text-sm font-semibold tracking-[0.05em]">
+              I&apos;m Stuck
+            </p>
+            <p className="mt-1 text-xs leading-snug text-[#E8DCC8]/75">
+              Unblock fast
+            </p>
+          </MotionLink>
+          <MotionLink
+            href="/chat?mode=plan"
+            className={MODE_CARD}
+            whileHover={{ y: -4 }}
+            transition={{ type: "spring", stiffness: 400, damping: 28 }}
+          >
+            <span className="text-2xl opacity-[0.72]" aria-hidden>
+              🗺️
+            </span>
+            <p className="kai-heading mt-2 text-sm font-semibold tracking-[0.05em]">
+              Review My Plan
+            </p>
+            <p className="mt-1 text-xs leading-snug text-[#E8DCC8]/75">
+              Gaps and risks
+            </p>
+          </MotionLink>
+          <motion.button
+            type="button"
+            onClick={openBrainstorm}
+            className={`${MODE_CARD} w-full text-left`}
+            whileHover={{ y: -4 }}
+            transition={{ type: "spring", stiffness: 400, damping: 28 }}
+          >
+            <span className="text-2xl" aria-hidden>
+              💡
+            </span>
+            <p className="kai-heading mt-2 text-sm font-semibold tracking-[0.05em]">
+              Brainstorm
+            </p>
+            <p className="mt-1 text-xs leading-snug text-[#E8DCC8]/75">
+              Generate options
+            </p>
+          </motion.button>
         </motion.div>
       </main>
 

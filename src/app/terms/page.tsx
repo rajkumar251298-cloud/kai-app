@@ -14,7 +14,9 @@ export default function TermsPage() {
         <h1 className="kai-heading mt-4 text-3xl font-semibold tracking-[0.04em] text-[#F5F0E8] sm:text-4xl">
           Terms of Service
         </h1>
-        <p className="mt-2 text-sm text-[#C9A84C]/85">Last updated: March 2026</p>
+        <p className="mt-2 text-sm text-[#C9A84C]/85">
+          Last updated: March 29, 2026
+        </p>
 
         <div className="mt-8 space-y-10">
           <section className="rounded-2xl border border-[rgba(201,168,76,0.18)] bg-[#111111] p-5 shadow-[0_10px_30px_rgba(0,0,0,0.55)] sm:p-6">
@@ -38,11 +40,40 @@ export default function TermsPage() {
               <li>Team accountability boards</li>
               <li>Mind games and habit quizzes</li>
               <li>Personal dashboard and streak tracking</li>
+              <li>
+                AI-powered weekly report cards with personalised performance
+                grades
+              </li>
+              <li>
+                Mind games including daily word puzzle, memory card flip, and
+                logic pattern puzzle
+              </li>
+              <li>Habit quiz and daily reflection questions</li>
+              <li>
+                Level progression system with badges and streak points
+              </li>
+              <li>
+                Smart nudge notifications to maintain daily accountability
+              </li>
+              <li>
+                Personalised coaching based on your age group and goal type
+              </li>
             </ul>
             <p className={`${body} mt-4`}>
               KAI is a productivity and coaching tool. It is not a substitute for
               professional mental health support, medical advice, or professional
               coaching.
+            </p>
+          </section>
+
+          <section className="rounded-2xl border border-[rgba(201,168,76,0.18)] bg-[#111111] p-5 shadow-[0_10px_30px_rgba(0,0,0,0.55)] sm:p-6">
+            <h2 className={sectionTitle}>SECTION 2A — AI Personalisation</h2>
+            <p className={body}>
+              KAI personalises its coaching approach based on your age group
+              (student, early career, entrepreneur, or senior professional) and
+              your primary goal type. This personalisation affects the tone,
+              questions, and suggestions KAI provides. You can update your
+              preferences at any time through the Profile settings.
             </p>
           </section>
 
@@ -82,27 +113,26 @@ export default function TermsPage() {
 
           <section className="rounded-2xl border border-[rgba(201,168,76,0.18)] bg-[#111111] p-5 shadow-[0_10px_30px_rgba(0,0,0,0.55)] sm:p-6">
             <h2 className={sectionTitle}>SECTION 5 — Subscription and Payments</h2>
+            <p className={`${body} mb-3`}>KAI offers a free tier that includes:</p>
             <ul className={list}>
-              <li>KAI offers a free tier with limited features</li>
-              <li>Premium plans are available at published rates</li>
-              <li>Payments are processed securely through Stripe</li>
-              <li>
-                Subscriptions auto-renew unless cancelled before the renewal date
-              </li>
-              <li>
-                Refunds are available within 7 days of payment if you are not
-                satisfied
-              </li>
-              <li>
-                To cancel or request a refund contact{" "}
-                <a
-                  href="mailto:contactkai26@gmail.com"
-                  className="text-[#C9A84C] underline hover:text-[#F5E6B3]"
-                >
-                  contactkai26@gmail.com
-                </a>
-              </li>
+              <li>Daily check-in conversations</li>
+              <li>Basic goal tracking</li>
+              <li>Mind games and habit quiz</li>
+              <li>Weekly report card</li>
             </ul>
+            <p className={`${body} mt-4 mb-3`}>
+              Premium features (coming soon) will include:
+            </p>
+            <ul className={list}>
+              <li>Unlimited team members on the board</li>
+              <li>Advanced analytics and insights</li>
+              <li>Priority AI response speed</li>
+              <li>Custom KAI coaching personas</li>
+            </ul>
+            <p className={`${body} mt-4`}>
+              Current pricing: Free during beta. Paid plans will be announced via
+              email before implementation.
+            </p>
           </section>
 
           <section className="rounded-2xl border border-[rgba(201,168,76,0.18)] bg-[#111111] p-5 shadow-[0_10px_30px_rgba(0,0,0,0.55)] sm:p-6">
@@ -178,8 +208,9 @@ export default function TermsPage() {
           <section className="rounded-2xl border border-[rgba(201,168,76,0.18)] bg-[#111111] p-5 shadow-[0_10px_30px_rgba(0,0,0,0.55)] sm:p-6">
             <h2 className={sectionTitle}>SECTION 10 — Governing Law</h2>
             <p className={body}>
-              These terms are governed by the laws of India. Any disputes shall
-              be resolved through arbitration in Chennai, Tamil Nadu.
+              These terms are governed by the laws of India. The app is operated
+              from Chennai, Tamil Nadu. Any disputes shall be subject to the
+              exclusive jurisdiction of courts in Chennai, Tamil Nadu, India.
             </p>
           </section>
 
@@ -195,7 +226,20 @@ export default function TermsPage() {
                 contactkai26@gmail.com
               </a>
             </p>
-            <p className={`${body} mt-2`}>Response time: Within 48 hours</p>
+            <p className={`${body} mt-2`}>
+              Website:{" "}
+              <a
+                href="https://kai-app-beige.vercel.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-[#C9A84C] underline hover:text-[#F5E6B3]"
+              >
+                kai-app-beige.vercel.app
+              </a>
+            </p>
+            <p className={`${body} mt-2`}>
+              Support hours: Monday to Friday, 9am to 6pm IST
+            </p>
           </section>
         </div>
       </main>

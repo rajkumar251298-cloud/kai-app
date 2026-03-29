@@ -7,6 +7,7 @@ import {
 } from "@/components/LevelSystem";
 import { GoalAchievedOverlay } from "@/components/GoalAchievedOverlay";
 import { StreakOverlays } from "@/components/StreakOverlays";
+import { StreakPopup } from "@/components/StreakPopup";
 import { checkAndAwardBadges } from "@/lib/checkBadges";
 import { ensureStreakProcessed } from "@/lib/streakSystem";
 import { scheduleNotifications } from "@/lib/notifications";
@@ -65,6 +66,7 @@ export function AppBootstrap() {
   return (
     <>
       <StreakOverlays />
+      <StreakPopup />
       <GoalAchievedOverlay />
       {toastMsg && (
         <div

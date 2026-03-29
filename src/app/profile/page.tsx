@@ -83,6 +83,16 @@ function initialsFromEmail(email: string | null | undefined): string {
   return ch ? ch.toUpperCase() : "?";
 }
 
+function googleDisplayName(metadata: unknown): string | null {
+  if (!metadata || typeof metadata !== "object") return null;
+  const m = metadata as Record<string, unknown>;
+  for (const k of ["full_name", "name"] as const) {
+    const v = m[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return null;
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -98,8 +108,10 @@ export default function ProfilePage() {
   const [reminderTime, setReminderTime] = useState("09:00");
   const [emailDisplay, setEmailDisplay] = useState("");
 
-  const [nameModal, setNameModal] = useState(false);
-  const [nameDraft, setNameDraft] = useState("");
+  const [nameEditing, setNameEditing] = useState(false);
+  const [nameFieldDraft, setNameFieldDraft] = useState("");
+  const [nameSavedFlash, setNameSavedFlash] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const [timeModal, setTimeModal] = useState(false);
   const [timeDraft, setTimeDraft] = useState("");
   const [goalModal, setGoalModal] = useState<null | { mode: "add" } | { mode: "edit"; id: string; text: string }>(null);
@@ -211,13 +223,37 @@ export default function ProfilePage() {
     setReminderTime(t);
   };
 
-  const submitName = (e: FormEvent) => {
-    e.preventDefault();
-    const t = nameDraft.trim();
-    if (t) localStorage.setItem(K_USER, t);
-    setUserName(t || null);
-    setNameModal(false);
-  };
+  const openNameEdit = useCallback(() => {
+    const gn = user ? googleDisplayName(user.user_metadata) : null;
+    setNameFieldDraft((userName?.trim() || gn || "").trim());
+    setNameEditing(true);
+  }, [user, userName]);
+
+  const saveInlineName = useCallback(async () => {
+    const t = nameFieldDraft.trim();
+    if (!t) {
+      setNameEditing(false);
+      return;
+    }
+    localStorage.setItem(K_USER, t);
+    setUserName(t);
+    if (user && isSupabaseConfigured) {
+      try {
+        await supabase.auth.updateUser({ data: { full_name: t } });
+      } catch {
+        /* ignore */
+      }
+    }
+    setNameEditing(false);
+    setNameSavedFlash(true);
+    window.setTimeout(() => setNameSavedFlash(false), 2000);
+  }, [nameFieldDraft, user]);
+
+  useEffect(() => {
+    if (!nameEditing) return;
+    const id = requestAnimationFrame(() => nameInputRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [nameEditing]);
 
   const submitTime = (e: FormEvent) => {
     e.preventDefault();
@@ -287,7 +323,10 @@ export default function ProfilePage() {
     router.replace("/login");
   };
 
-  const displayName = userName?.trim() || "Your name";
+  const googleName = user ? googleDisplayName(user.user_metadata) : null;
+  const profileDisplayName = user
+    ? googleName || userName?.trim() || "KAI User"
+    : userName?.trim() || null;
 
   const meta = user?.user_metadata as
     | { avatar_url?: string; picture?: string }
@@ -350,14 +389,62 @@ export default function ProfilePage() {
               avatarInitials
             )}
           </div>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            <h1 className="kai-heading text-3xl font-semibold tracking-[0.04em] text-[#F5F0E8] sm:text-4xl">
-              {displayName}
-            </h1>
-            {user && (
-              <span className="inline-flex items-center rounded-full border border-emerald-500/45 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-400/95">
-                ✅ Synced
-              </span>
+          <div className="mt-4 flex min-h-[3rem] flex-wrap items-center justify-center gap-2">
+            {!nameEditing ? (
+              <>
+                {profileDisplayName ? (
+                  <span className="kai-heading kai-plain-display text-3xl font-semibold tracking-[0.04em] text-[#F5F0E8] sm:text-4xl">
+                    {profileDisplayName}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={openNameEdit}
+                    className="kai-plain-display text-xl font-medium text-[#E8DCC8]/50 transition hover:text-[#E8DCC8]"
+                  >
+                    Set your name
+                  </button>
+                )}
+                {(profileDisplayName || user) && (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={openNameEdit}
+                    className="cursor-pointer text-lg text-[#C9A84C] transition hover:text-[#F5E6B3]"
+                    aria-label="Edit name"
+                  >
+                    ✏️
+                  </button>
+                )}
+                {user && (
+                  <span className="inline-flex items-center rounded-full border border-emerald-500/45 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-400/95">
+                    ✅ Synced
+                  </span>
+                )}
+              </>
+            ) : (
+              <div className="flex w-full max-w-sm flex-col items-center gap-2">
+                <input
+                  ref={nameInputRef}
+                  type="text"
+                  value={nameFieldDraft}
+                  onChange={(e) => setNameFieldDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void saveInlineName();
+                  }}
+                  onBlur={() => {
+                    void saveInlineName();
+                  }}
+                  className="min-h-[44px] w-full rounded-xl border border-[rgba(201,168,76,0.35)] bg-black px-4 py-3 text-center text-lg text-[#F5F0E8] focus:border-[rgba(201,168,76,0.55)] focus:outline-none"
+                  placeholder="Your name"
+                  aria-label="Your name"
+                />
+                {nameSavedFlash && (
+                  <span className="text-sm font-medium text-[#C9A84C]" role="status">
+                    Saved ✓
+                  </span>
+                )}
+              </div>
             )}
           </div>
           {user?.email && (
@@ -381,16 +468,6 @@ export default function ProfilePage() {
             Account
           </h2>
           <div className="space-y-2">
-            <button
-              type="button"
-              className={BTN_ROW}
-              onClick={() => {
-                setNameDraft(userName || "");
-                setNameModal(true);
-              }}
-            >
-              Edit name
-            </button>
             <button
               type="button"
               className={BTN_ROW}
@@ -656,32 +733,6 @@ export default function ProfilePage() {
           </button>
         )}
       </main>
-
-      {nameModal && (
-        <ModalWrap title="Edit name" onClose={() => setNameModal(false)}>
-          <form onSubmit={submitName} className="space-y-3">
-            <input
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              className="min-h-[44px] w-full rounded-xl border border-[rgba(201,168,76,0.28)] bg-black px-4 py-3 text-[#F5F0E8]"
-              placeholder="Your name"
-              autoFocus
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                className="rounded-lg px-4 py-2 text-sm text-[#E8DCC8]/65"
-                onClick={() => setNameModal(false)}
-              >
-                Cancel
-              </button>
-              <button type="submit" className={GOLD_CTA}>
-                Save
-              </button>
-            </div>
-          </form>
-        </ModalWrap>
-      )}
 
       {timeModal && (
         <ModalWrap title="Check-in time" onClose={() => setTimeModal(false)}>

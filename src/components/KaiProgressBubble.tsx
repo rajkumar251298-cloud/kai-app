@@ -1,5 +1,6 @@
 "use client";
 
+import { OPEN_STREAK_POPUP } from "@/components/StreakPopup";
 import {
   getConsecutiveCheckinStreak,
   getLast7DaysCheckinFlags,
@@ -265,18 +266,28 @@ export function KaiProgressBubble() {
                     ⚡ {snapshot.ptsToday}
                   </span>
                 </div>
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1">
-                    <span aria-hidden>🔥</span>
-                    Streak
-                  </span>
-                  <span className="font-semibold text-[#C9A84C]">
-                    {snapshot.streak} days
-                  </span>
-                </div>
-                <p className="mt-1 text-center text-[10px] text-[#E8DCC8]/45">
-                  🔥 {snapshot.streak} day streak · Best: {snapshot.best} days
-                </p>
+                <button
+                  type="button"
+                  className="mt-2 w-full rounded-lg border border-transparent py-1.5 text-left transition hover:border-[rgba(201,168,76,0.2)] hover:bg-white/[0.04]"
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent(OPEN_STREAK_POPUP));
+                    setOpen(false);
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1">
+                      <span aria-hidden>🔥</span>
+                      Streak
+                    </span>
+                    <span className="font-semibold text-[#C9A84C]">
+                      {snapshot.streak} days
+                    </span>
+                  </div>
+                  <p className="mt-1 text-center text-[10px] text-[#E8DCC8]/45">
+                    🔥 {snapshot.streak} day streak · Best: {snapshot.best}{" "}
+                    days · tap
+                  </p>
+                </button>
                 <div className="mt-2 flex justify-between gap-1">
                   {snapshot.week.map((done, i) => (
                     <div

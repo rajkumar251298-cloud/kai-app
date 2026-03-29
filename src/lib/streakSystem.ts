@@ -356,3 +356,47 @@ export function getCheckinHistory(): string[] {
   ensureStreakProcessed();
   return readHistory();
 }
+
+const SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
+/** Full Mon–Sun week for popup calendar (labels Mon–Sun order). */
+export function getFullWeekCalendarCells(now = new Date()): WeekStreakCell[] {
+  if (typeof window === "undefined") return [];
+  ensureStreakProcessed();
+  const today = localDateKey(now);
+  const monday = mondayOfWeekContaining(now);
+  const set = new Set(readHistory());
+  const out: WeekStreakCell[] = [];
+  for (let i = 0; i < 7; i += 1) {
+    const d = addLocalDays(monday, i);
+    const shortLabel = SHORT[i] ?? "—";
+    let status: WeekCellStatus;
+    if (d > today) {
+      status = "future";
+    } else if (set.has(d)) {
+      status = "done";
+    } else if (d === today) {
+      status = "today_pending";
+    } else {
+      status = "missed";
+    }
+    out.push({ iso: d, shortLabel, status });
+  }
+  return out;
+}
+
+/** Check-ins recorded Mon–Sun this week up to and including today. */
+export function countCheckinsThisWeekSoFar(now = new Date()): number {
+  if (typeof window === "undefined") return 0;
+  ensureStreakProcessed();
+  const today = localDateKey(now);
+  const monday = mondayOfWeekContaining(now);
+  const set = new Set(readHistory());
+  let n = 0;
+  for (let i = 0; i < 7; i += 1) {
+    const d = addLocalDays(monday, i);
+    if (d > today) break;
+    if (set.has(d)) n += 1;
+  }
+  return n;
+}

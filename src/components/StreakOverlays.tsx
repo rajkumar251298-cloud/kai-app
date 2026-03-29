@@ -1,48 +1,15 @@
 "use client";
 
+import { OPEN_STREAK_POPUP } from "@/components/StreakPopup";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 type BrokenDetail = { previousStreak: number; longestStreak: number };
 type FreezeDetail = { protectedStreak: number };
-type MilestoneDetail = { days: number };
-
-const MILESTONE_COPY: Record<
-  number,
-  { emoji: string; line: string }
-> = {
-  7: {
-    emoji: "🔥",
-    line: "One week straight. You're not like most people.",
-  },
-  14: {
-    emoji: "⚡",
-    line: "Two weeks. The habit is forming.",
-  },
-  21: {
-    emoji: "💪",
-    line: "21 days. Scientists say this is where habits become automatic.",
-  },
-  30: {
-    emoji: "🏆",
-    line: "30 days. You are in the top 5% of KAI users.",
-  },
-  60: {
-    emoji: "👑",
-    line: "60 days. This is rare. Most people quit by now.",
-  },
-  90: {
-    emoji: "💎",
-    line: "90 days. You did what you said you would. Remember this moment.",
-  },
-};
 
 export function StreakOverlays() {
   const [broken, setBroken] = useState<BrokenDetail | null>(null);
   const [freeze, setFreeze] = useState<FreezeDetail | null>(null);
-  const [milestone, setMilestone] = useState<MilestoneDetail | null>(null);
-
-  const dismissMilestone = useCallback(() => setMilestone(null), []);
 
   useEffect(() => {
     const onBroken = (e: Event) => {
@@ -53,9 +20,8 @@ export function StreakOverlays() {
       const d = (e as CustomEvent<FreezeDetail>).detail;
       if (d?.protectedStreak != null) setFreeze(d);
     };
-    const onMilestone = (e: Event) => {
-      const d = (e as CustomEvent<MilestoneDetail>).detail;
-      if (d?.days != null) setMilestone(d);
+    const onMilestone = () => {
+      window.dispatchEvent(new CustomEvent(OPEN_STREAK_POPUP));
     };
     window.addEventListener("kai-streak-broken", onBroken);
     window.addEventListener("kai-streak-freeze-used", onFreeze);
@@ -66,12 +32,6 @@ export function StreakOverlays() {
       window.removeEventListener("kai-streak-milestone", onMilestone);
     };
   }, []);
-
-  useEffect(() => {
-    if (!milestone) return;
-    const t = window.setTimeout(dismissMilestone, 3000);
-    return () => window.clearTimeout(t);
-  }, [milestone, dismissMilestone]);
 
   return (
     <>
@@ -137,22 +97,6 @@ export function StreakOverlays() {
               Got it
             </button>
           </div>
-        </div>
-      )}
-
-      {milestone && MILESTONE_COPY[milestone.days] && (
-        <div
-          className="fixed inset-0 z-[208] flex flex-col items-center justify-center bg-black/95 px-6"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="kai-level-particles pointer-events-none absolute inset-0 overflow-hidden" />
-          <div className="kai-streak-milestone-bounce relative text-7xl">
-            {MILESTONE_COPY[milestone.days]!.emoji}
-          </div>
-          <p className="relative mt-8 max-w-sm text-center text-lg font-medium leading-relaxed text-[#F5F0E8]">
-            {MILESTONE_COPY[milestone.days]!.line}
-          </p>
         </div>
       )}
     </>

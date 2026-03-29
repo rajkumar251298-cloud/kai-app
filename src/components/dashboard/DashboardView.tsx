@@ -5,13 +5,17 @@ import { Header } from "@/components/Header";
 import { HomeBackLink } from "@/components/HomeBackLink";
 import { KaiProgressBar } from "@/components/KaiProgressBar";
 import {
+  LAST_STREAK_POPUP_DATE_KEY,
+  OPEN_STREAK_POPUP,
+} from "@/components/StreakPopup";
+import {
   addUserGoal,
   daysUntilTarget,
   loadUserGoals,
   toggleMilestone,
   type UserGoal,
 } from "@/lib/goalSystem";
-import { getTotalPoints } from "@/lib/kaiPoints";
+import { getTotalPoints, todayKeyLocal } from "@/lib/kaiPoints";
 import {
   getDisplayedStreak,
   getLongestStreak,
@@ -167,6 +171,17 @@ export function DashboardView() {
   }, [streakTick, goalsTick]);
 
   useEffect(() => {
+    if (!authenticated || tab !== "progress") return;
+    const today = todayKeyLocal();
+    if (localStorage.getItem(LAST_STREAK_POPUP_DATE_KEY) === today) return;
+    queueMicrotask(() => {
+      window.dispatchEvent(
+        new CustomEvent(OPEN_STREAK_POPUP, { detail: { auto: true } }),
+      );
+    });
+  }, [authenticated, tab, queryKey]);
+
+  useEffect(() => {
     if (toast === null) return;
     const t = window.setTimeout(() => setToast(null), 1400);
     return () => window.clearTimeout(t);
@@ -263,7 +278,13 @@ export function DashboardView() {
 
         {tab === "progress" && (
           <>
-            <section className={CARD}>
+            <button
+              type="button"
+              className={`${CARD} w-full cursor-pointer text-left`}
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent(OPEN_STREAK_POPUP));
+              }}
+            >
               <h2 className="kai-heading mb-4 text-sm font-semibold tracking-[0.05em]">
                 Weekly streak
               </h2>
@@ -303,7 +324,10 @@ export function DashboardView() {
               <p className="mt-5 text-center text-sm font-medium text-[#C9A84C] sm:text-[15px]">
                 🔥 {streakCount} day streak · Best: {bestStreak} days
               </p>
-            </section>
+              <p className="mt-2 text-center text-xs text-[#E8DCC8]/45">
+                Tap for streak summary
+              </p>
+            </button>
 
             <section className={CARD}>
               <h2 className="kai-heading mb-4 text-sm font-semibold tracking-[0.05em]">

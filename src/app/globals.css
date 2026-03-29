@@ -40,6 +40,13 @@ body {
   color: #f5f0e8;
 }
 
+/* Static display text — no I-beam / caret affordance */
+.kai-plain-display {
+  cursor: default;
+  user-select: none;
+  caret-color: transparent;
+}
+
 /* Cards — premium shell */
 .kai-card {
   background: #111111;
