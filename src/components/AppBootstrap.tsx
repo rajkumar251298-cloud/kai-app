@@ -5,13 +5,17 @@ import {
   type LevelTier,
   runLevelUpCheck,
 } from "@/components/LevelSystem";
+import { GoalAchievedOverlay } from "@/components/GoalAchievedOverlay";
+import { StreakOverlays } from "@/components/StreakOverlays";
 import { checkAndAwardBadges } from "@/lib/checkBadges";
+import { ensureStreakProcessed } from "@/lib/streakSystem";
 import { scheduleNotifications } from "@/lib/notifications";
 import { useCallback, useEffect, useState } from "react";
 
 export function AppBootstrap() {
   const [levelTier, setLevelTier] = useState<LevelTier | null>(null);
   const [newDayToast, setNewDayToast] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const dismissNewDay = useCallback(() => setNewDayToast(false), []);
 
@@ -28,7 +32,23 @@ export function AppBootstrap() {
   }, [newDayToast, dismissNewDay]);
 
   useEffect(() => {
+    const onToast = (e: Event) => {
+      const m = (e as CustomEvent<{ message: string }>).detail?.message;
+      if (m) setToastMsg(m);
+    };
+    window.addEventListener("kai-toast", onToast);
+    return () => window.removeEventListener("kai-toast", onToast);
+  }, []);
+
+  useEffect(() => {
+    if (!toastMsg) return;
+    const t = window.setTimeout(() => setToastMsg(null), 3200);
+    return () => window.clearTimeout(t);
+  }, [toastMsg]);
+
+  useEffect(() => {
     const boot = () => {
+      ensureStreakProcessed();
       checkAndAwardBadges();
       scheduleNotifications();
       runLevelUpCheck(setLevelTier);
@@ -44,6 +64,16 @@ export function AppBootstrap() {
 
   return (
     <>
+      <StreakOverlays />
+      <GoalAchievedOverlay />
+      {toastMsg && (
+        <div
+          className="pointer-events-none fixed bottom-24 left-1/2 z-[195] w-[min(92vw,22rem)] -translate-x-1/2 rounded-xl border border-[rgba(201,168,76,0.35)] bg-black/95 px-4 py-3 text-center text-sm text-[#E8DCC8] shadow-[0_8px_32px_rgba(0,0,0,0.6)]"
+          role="status"
+        >
+          {toastMsg}
+        </div>
+      )}
       {newDayToast && (
         <div
           className="pointer-events-none fixed bottom-6 left-1/2 z-[190] w-[min(92vw,24rem)] -translate-x-1/2 rounded-xl border border-[rgba(201,168,76,0.35)] bg-black/95 px-4 py-3 text-center text-sm text-[#E8DCC8] shadow-[0_8px_32px_rgba(0,0,0,0.6)]"

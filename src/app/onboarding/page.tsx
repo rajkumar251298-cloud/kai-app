@@ -7,6 +7,11 @@ import {
   KAI_LS_USER_NAME,
   getStoredUserGoal,
 } from "@/lib/kaiLocalProfile";
+import { addUserGoal } from "@/lib/goalSystem";
+import {
+  LS_USER_AGE_GROUP,
+  LS_USER_GOAL_TYPE,
+} from "@/lib/kaiPersona";
 import Link from "next/link";
 import {
   K_NOTIFY,
@@ -48,9 +53,32 @@ const MSG_6 =
 
 const MSG_7 = "What time do you want me to show up every day?";
 
-function msg4(name: string) {
-  return `Good to meet you, ${name}. What's the one thing you keep saying you'll do but haven't yet?`;
+const AGE_OPTIONS = [
+  { value: "student", emoji: "🎓", label: "Student (16-22)" },
+  { value: "early_career", emoji: "💼", label: "Early Career (22-30)" },
+  { value: "building", emoji: "🚀", label: "Building Something (any age)" },
+  { value: "senior", emoji: "👔", label: "Senior Professional (30+)" },
+] as const;
+
+const GOAL_TYPE_OPTIONS = [
+  { value: "study", emoji: "📚", label: "Study & Exam Goals" },
+  { value: "career", emoji: "💰", label: "Career & Business Growth" },
+  { value: "health", emoji: "🏋️", label: "Health & Personal Habits" },
+  { value: "startup", emoji: "🎯", label: "Side Project or Startup" },
+] as const;
+
+function msgAge(name: string) {
+  return `Quick one ${name} — which best describes where you are in life?`;
 }
+
+const MSG_GOAL_TYPE =
+  "And what brings you here? What do you actually want to change?";
+
+const MSG_PRIMARY_GOAL = `Let's make this real. What is your #1 goal right now? The one thing that if you achieved it in the next 90 days would change everything?`;
+
+const MSG_MILESTONES = `Good. Now break it down — what are 3 milestones that would tell you you're making progress toward that?`;
+
+const MSG_DEADLINE = `And when do you want to achieve this by?`;
 
 function msg8(timeLabel: string) {
   return `Perfect. I'll be here at ${timeLabel}. Most people who use tools like this don't follow through. I don't think you're most people. See you tomorrow morning. Don't be late. 😏`;
@@ -67,7 +95,11 @@ type ChatMessage = {
 type Phase =
   | "intro"
   | "wait_name"
-  | "wait_goal"
+  | "wait_age"
+  | "wait_goal_type"
+  | "wait_primary_goal"
+  | "wait_milestones"
+  | "wait_goal_deadline"
   | "wait_vision"
   | "wait_blocker"
   | "wait_time"
@@ -94,6 +126,11 @@ export default function OnboardingPage() {
   const [input, setInput] = useState("");
   const [otherTimeOpen, setOtherTimeOpen] = useState(false);
   const [otherTimeDraft, setOtherTimeDraft] = useState("");
+  const [primaryGoalTitle, setPrimaryGoalTitle] = useState("");
+  const [ms1, setMs1] = useState("");
+  const [ms2, setMs2] = useState("");
+  const [ms3, setMs3] = useState("");
+  const [goalTargetDate, setGoalTargetDate] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -150,20 +187,17 @@ export default function OnboardingPage() {
       if (typeof window !== "undefined") {
         localStorage.setItem(STORAGE_KEYS.userName, text);
       }
-      setPhase("wait_goal");
-      await pushKai(msg4(text));
+      setPhase("wait_age");
+      await pushKai(msgAge(text));
       return;
     }
 
-    if (phase === "wait_goal") {
+    if (phase === "wait_primary_goal") {
       setInput("");
       pushUser(text);
-      if (typeof window !== "undefined") {
-        localStorage.setItem(STORAGE_KEYS.userGoal, text);
-        localStorage.removeItem("mainGoal");
-      }
-      setPhase("wait_vision");
-      await pushKai(MSG_5);
+      setPrimaryGoalTitle(text);
+      setPhase("wait_milestones");
+      await pushKai(MSG_MILESTONES);
       return;
     }
 
@@ -206,6 +240,14 @@ export default function OnboardingPage() {
           : "";
       const userGoal =
         typeof window !== "undefined" ? getStoredUserGoal() : "";
+      const userAgeGroup =
+        typeof window !== "undefined"
+          ? localStorage.getItem(LS_USER_AGE_GROUP) ?? ""
+          : "";
+      const userGoalType =
+        typeof window !== "undefined"
+          ? localStorage.getItem(LS_USER_GOAL_TYPE) ?? ""
+          : "";
 
       try {
         const res = await fetch("/api/chat", {
@@ -216,6 +258,8 @@ export default function OnboardingPage() {
             userName,
             userGoal,
             chatMode: "checkin",
+            userAgeGroup,
+            userGoalType,
           }),
         });
         const data: { reply?: string; error?: string } = await res.json();
@@ -275,9 +319,69 @@ export default function OnboardingPage() {
     setOtherTimeDraft("");
   };
 
+  const pickAge = async (value: (typeof AGE_OPTIONS)[number]["value"]) => {
+    if (phase !== "wait_age" || isKaiTyping) return;
+    const label = AGE_OPTIONS.find((o) => o.value === value)?.label ?? value;
+    pushUser(label);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(LS_USER_AGE_GROUP, value);
+    }
+    setPhase("wait_goal_type");
+    await pushKai(MSG_GOAL_TYPE);
+  };
+
+  const pickGoalType = async (
+    value: (typeof GOAL_TYPE_OPTIONS)[number]["value"],
+  ) => {
+    if (phase !== "wait_goal_type" || isKaiTyping) return;
+    const label =
+      GOAL_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? value;
+    pushUser(label);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(LS_USER_GOAL_TYPE, value);
+    }
+    setPhase("wait_primary_goal");
+    await pushKai(MSG_PRIMARY_GOAL);
+  };
+
+  const submitMilestones = async () => {
+    if (phase !== "wait_milestones" || isKaiTyping) return;
+    const a = ms1.trim();
+    const b = ms2.trim();
+    const c = ms3.trim();
+    if (!a || !b || !c) return;
+    pushUser(`${a} | ${b} | ${c}`);
+    const d = new Date();
+    d.setDate(d.getDate() + 90);
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, "0");
+    const da = String(d.getDate()).padStart(2, "0");
+    setGoalTargetDate(`${y}-${mo}-${da}`);
+    setPhase("wait_goal_deadline");
+    await pushKai(MSG_DEADLINE);
+  };
+
+  const submitGoalDeadline = async () => {
+    if (phase !== "wait_goal_deadline" || isKaiTyping) return;
+    if (!goalTargetDate || !primaryGoalTitle.trim()) return;
+    pushUser(goalTargetDate);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEYS.userGoal, primaryGoalTitle.trim());
+      localStorage.removeItem("mainGoal");
+      addUserGoal({
+        title: primaryGoalTitle.trim(),
+        targetDate: goalTargetDate,
+        category: "work",
+        milestones: [ms1.trim(), ms2.trim(), ms3.trim()],
+      });
+    }
+    setPhase("wait_vision");
+    await pushKai(MSG_5);
+  };
+
   const showTextInput =
     phase === "wait_name" ||
-    phase === "wait_goal" ||
+    phase === "wait_primary_goal" ||
     phase === "wait_vision" ||
     phase === "wait_blocker" ||
     phase === "ai_chat";
@@ -301,6 +405,89 @@ export default function OnboardingPage() {
           )}
 
           {isKaiTyping && <TypingRow />}
+
+          {phase === "wait_age" && !isKaiTyping && (
+            <div className="kai-msg-animate flex max-w-lg flex-col gap-2 pt-1 pl-[52px] pr-2">
+              {AGE_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => void pickAge(o.value)}
+                  className="kai-btn-shimmer rounded-xl border border-[rgba(201,168,76,0.35)] bg-black px-4 py-3 text-left text-sm font-medium text-[#E8DCC8] transition hover:border-[rgba(201,168,76,0.55)]"
+                >
+                  {o.emoji} {o.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {phase === "wait_goal_type" && !isKaiTyping && (
+            <div className="kai-msg-animate flex max-w-lg flex-col gap-2 pt-1 pl-[52px] pr-2">
+              {GOAL_TYPE_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => void pickGoalType(o.value)}
+                  className="kai-btn-shimmer rounded-xl border border-[rgba(201,168,76,0.35)] bg-black px-4 py-3 text-left text-sm font-medium text-[#E8DCC8] transition hover:border-[rgba(201,168,76,0.55)]"
+                >
+                  {o.emoji} {o.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {phase === "wait_milestones" && !isKaiTyping && (
+            <div className="kai-msg-animate max-w-lg space-y-3 pt-1 pl-[52px] pr-2">
+              <input
+                value={ms1}
+                onChange={(e) => setMs1(e.target.value)}
+                placeholder="Milestone 1"
+                className="w-full rounded-xl border border-[rgba(201,168,76,0.28)] bg-black px-4 py-2.5 text-sm text-[#F5F0E8]"
+              />
+              <input
+                value={ms2}
+                onChange={(e) => setMs2(e.target.value)}
+                placeholder="Milestone 2"
+                className="w-full rounded-xl border border-[rgba(201,168,76,0.28)] bg-black px-4 py-2.5 text-sm text-[#F5F0E8]"
+              />
+              <input
+                value={ms3}
+                onChange={(e) => setMs3(e.target.value)}
+                placeholder="Milestone 3"
+                className="w-full rounded-xl border border-[rgba(201,168,76,0.28)] bg-black px-4 py-2.5 text-sm text-[#F5F0E8]"
+              />
+              <button
+                type="button"
+                onClick={() => void submitMilestones()}
+                disabled={!ms1.trim() || !ms2.trim() || !ms3.trim()}
+                className="kai-btn-shimmer w-full rounded-xl border border-[rgba(201,168,76,0.45)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] py-3 text-sm font-semibold text-black/90 disabled:opacity-40"
+              >
+                Continue
+              </button>
+            </div>
+          )}
+
+          {phase === "wait_goal_deadline" && !isKaiTyping && (
+            <div className="kai-msg-animate max-w-lg space-y-3 pt-1 pl-[52px] pr-2">
+              <label className="block text-sm text-[#E8DCC8]/75">
+                Target date
+                <input
+                  type="date"
+                  value={goalTargetDate}
+                  onChange={(e) => setGoalTargetDate(e.target.value)}
+                  className="mt-2 w-full rounded-xl border border-[rgba(201,168,76,0.28)] bg-black px-4 py-2.5 text-sm text-[#F5F0E8]"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void submitGoalDeadline()}
+                disabled={!goalTargetDate}
+                className="kai-btn-shimmer w-full rounded-xl border border-[rgba(201,168,76,0.45)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] py-3 text-sm font-semibold text-black/90 disabled:opacity-40"
+              >
+                Save goal
+              </button>
+            </div>
+          )}
 
           {phase === "wait_time" && !isKaiTyping && (
             <div className="kai-msg-animate pt-1 pl-[52px]">

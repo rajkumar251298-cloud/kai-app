@@ -83,7 +83,7 @@ export const BADGE_INFO: Record<
   goal_crusher: {
     emoji: "🎯",
     name: "Goal Crusher",
-    how: "Mark a goal as complete.",
+    how: "Reach 100% on a structured goal you set in KAI.",
   },
 };
 

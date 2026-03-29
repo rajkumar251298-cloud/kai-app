@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/AuthProvider";
+import { getDisplayedStreak, ensureStreakProcessed } from "@/lib/streakSystem";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -189,6 +190,22 @@ function KaiBrandMenu() {
 
 export function Header() {
   const pathname = usePathname();
+  const [streak, setStreak] = useState(0);
+
+  useEffect(() => {
+    const read = () => {
+      ensureStreakProcessed();
+      setStreak(getDisplayedStreak());
+    };
+    queueMicrotask(read);
+    const onUp = () => queueMicrotask(read);
+    window.addEventListener("kai-streak-updated", onUp);
+    window.addEventListener("focus", onUp);
+    return () => {
+      window.removeEventListener("kai-streak-updated", onUp);
+      window.removeEventListener("focus", onUp);
+    };
+  }, []);
 
   return (
     <header
@@ -198,6 +215,13 @@ export function Header() {
         <KaiBrandMenu />
 
         <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-3">
+          <span
+            className="hidden items-center gap-1 rounded-full border border-[rgba(201,168,76,0.28)] bg-[#111111] px-2.5 py-1 text-xs font-semibold tabular-nums text-[#C9A84C] sm:inline-flex"
+            title="Check-in streak"
+          >
+            <span aria-hidden>🔥</span>
+            {streak}
+          </span>
           <HeaderProfileAvatar />
 
           <nav

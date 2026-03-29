@@ -1,8 +1,11 @@
 import { readKaiMemory, type KaiMemory } from "@/lib/kaiMemory";
 import { todayKey } from "@/lib/kaiPoints";
+import {
+  checkinDefaultOpening,
+  todaysFocusTasksForPersona,
+} from "@/lib/kaiPersona";
 
-export const DEFAULT_CHECKIN_OPENING =
-  "What's the one thing you finish today that actually moves the needle? Not 'work on' — name the output.";
+export const DEFAULT_CHECKIN_OPENING = checkinDefaultOpening();
 
 /** Unfinished commitment from a prior calendar day (or explicit not-done). */
 export function shouldBlockTodaysFocus(m: KaiMemory): boolean {
@@ -25,7 +28,7 @@ export function buildCheckinOpening(m: KaiMemory): string {
   if (m.lastTask && m.lastCompleted === true) {
     return `You did what you said yesterday. Good. Now don't slow down. What's the ONE thing you finish today?`;
   }
-  return DEFAULT_CHECKIN_OPENING;
+  return checkinDefaultOpening();
 }
 
 export type TodaysFocusResult =
@@ -67,12 +70,8 @@ export function getTodaysFocus(goalRaw: string): TodaysFocusResult {
     };
   }
 
-  const clipped = goal.length > 100 ? `${goal.slice(0, 97)}…` : goal;
   return {
     blocked: false,
-    tasks: [
-      `Single concrete output today that proves progress on: ${clipped} — name it in check-in.`,
-      `Protect 25 minutes of uninterrupted work on that. No inbox. No “research.”`,
-    ],
+    tasks: todaysFocusTasksForPersona(goal),
   };
 }

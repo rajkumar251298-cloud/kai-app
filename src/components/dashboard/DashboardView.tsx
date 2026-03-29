@@ -4,7 +4,20 @@ import { useAuth } from "@/components/AuthProvider";
 import { Header } from "@/components/Header";
 import { HomeBackLink } from "@/components/HomeBackLink";
 import { KaiProgressBar } from "@/components/KaiProgressBar";
+import {
+  addUserGoal,
+  daysUntilTarget,
+  loadUserGoals,
+  toggleMilestone,
+  type UserGoal,
+} from "@/lib/goalSystem";
 import { getTotalPoints } from "@/lib/kaiPoints";
+import {
+  getDisplayedStreak,
+  getLongestStreak,
+  getWeekStreakCells,
+  ensureStreakProcessed,
+} from "@/lib/streakSystem";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -12,16 +25,6 @@ import { HabitQuizTab } from "./HabitQuizTab";
 import { MindGamesTab } from "./MindGamesTab";
 
 const CARD = "kai-card kai-card-interactive p-4 sm:p-5";
-
-const WEEK_DONE = [true, true, true, false, true, true, false] as const;
-
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-
-const GOALS: { label: string; pct: number }[] = [
-  { label: "Launch KAI app in 90 days", pct: 72 },
-  { label: "Get first 10 paying users", pct: 40 },
-  { label: "Do daily check-ins without missing", pct: 88 },
-];
 
 function barGradient(pct: number) {
   if (pct >= 70) {
@@ -68,6 +71,16 @@ export function DashboardView() {
   const [points, setPoints] = useState(0);
   const [toast, setToast] = useState<number | null>(null);
   const [localUserName, setLocalUserName] = useState<string | null>(null);
+  const [goalsTick, setGoalsTick] = useState(0);
+  const [streakTick, setStreakTick] = useState(0);
+  const [addGoalOpen, setAddGoalOpen] = useState(false);
+  const [newGoalTitle, setNewGoalTitle] = useState("");
+  const [newGoalCategory, setNewGoalCategory] =
+    useState<UserGoal["category"]>("work");
+  const [newGoalDate, setNewGoalDate] = useState("");
+  const [newM1, setNewM1] = useState("");
+  const [newM2, setNewM2] = useState("");
+  const [newM3, setNewM3] = useState("");
 
   useEffect(() => {
     const read = () =>
@@ -123,18 +136,41 @@ export function DashboardView() {
   }, [refreshPoints]);
 
   useEffect(() => {
+    const onGoals = () => setGoalsTick((t) => t + 1);
+    window.addEventListener("kai-goals-updated", onGoals);
+    return () => window.removeEventListener("kai-goals-updated", onGoals);
+  }, []);
+
+  useEffect(() => {
+    const onStreak = () => setStreakTick((t) => t + 1);
+    window.addEventListener("kai-streak-updated", onStreak);
+    window.addEventListener("focus", onStreak);
+    return () => {
+      window.removeEventListener("kai-streak-updated", onStreak);
+      window.removeEventListener("focus", onStreak);
+    };
+  }, []);
+
+  const [weekCells, setWeekCells] = useState<
+    ReturnType<typeof getWeekStreakCells>
+  >([]);
+  const [streakCount, setStreakCount] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  const [dashGoals, setDashGoals] = useState<UserGoal[]>([]);
+
+  useEffect(() => {
+    ensureStreakProcessed();
+    setWeekCells(getWeekStreakCells());
+    setStreakCount(getDisplayedStreak());
+    setBestStreak(getLongestStreak());
+    setDashGoals(loadUserGoals());
+  }, [streakTick, goalsTick]);
+
+  useEffect(() => {
     if (toast === null) return;
     const t = window.setTimeout(() => setToast(null), 1400);
     return () => window.clearTimeout(t);
   }, [toast]);
-
-  const doneCount = WEEK_DONE.filter(Boolean).length;
-  const missedLastDay = !WEEK_DONE[6] && doneCount > 0;
-  const streakCopy = missedLastDay
-    ? "You broke the streak.\nStart again today — or don't."
-    : doneCount === 0
-      ? "You haven't shown up this week. That doesn't fix itself."
-      : `You showed up ${doneCount} days this week.\nMost people quit at 3.`;
 
   const tabBtn = (id: Tab, label: string) => {
     const active = tab === id;
@@ -231,30 +267,41 @@ export function DashboardView() {
               <h2 className="kai-heading mb-4 text-sm font-semibold tracking-[0.05em]">
                 Weekly streak
               </h2>
-              <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
-                {DAYS.map((day, i) => {
-                  const done = WEEK_DONE[i];
+              <div
+                className="grid gap-1.5 sm:gap-2"
+                style={{
+                  gridTemplateColumns: `repeat(${Math.max(weekCells.length, 1)}, minmax(0, 1fr))`,
+                }}
+              >
+                {weekCells.map((cell) => {
+                  const box =
+                    cell.status === "done"
+                      ? "flex aspect-square w-full min-h-[36px] max-h-[52px] items-center justify-center rounded-xl bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] text-sm font-bold text-black/85 shadow-[0_0_18px_rgba(201,168,76,0.22)] sm:max-h-none"
+                      : cell.status === "today_pending"
+                        ? "kai-calendar-today-pulse flex aspect-square w-full min-h-[36px] max-h-[52px] items-center justify-center rounded-xl border-2 border-[#C9A84C] bg-black sm:max-h-none"
+                        : cell.status === "missed"
+                          ? "flex aspect-square w-full min-h-[36px] max-h-[52px] items-center justify-center rounded-xl border border-[rgba(180,60,60,0.25)] bg-[#1a0a0a] sm:max-h-none"
+                          : "flex aspect-square w-full min-h-[36px] max-h-[52px] items-center justify-center rounded-xl border border-[rgba(201,168,76,0.1)] bg-black sm:max-h-none";
                   return (
-                    <div key={day} className="flex flex-col items-center gap-1.5">
+                    <div
+                      key={cell.iso}
+                      className="flex flex-col items-center gap-1.5"
+                    >
                       <span className="text-[10px] font-medium uppercase tracking-wide text-[#E8DCC8]/50 sm:text-[11px]">
-                        {day}
+                        {cell.shortLabel}
                       </span>
                       <div
-                        className={
-                          done
-                            ? "flex aspect-square w-full min-h-[36px] max-h-[52px] items-center justify-center rounded-xl bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] text-sm font-bold text-black/85 shadow-[0_0_18px_rgba(201,168,76,0.22)] sm:max-h-none"
-                            : "flex aspect-square w-full min-h-[36px] max-h-[52px] items-center justify-center rounded-xl border border-[rgba(201,168,76,0.1)] bg-black sm:max-h-none"
-                        }
-                        aria-label={done ? `${day} completed` : `${day} missed`}
+                        className={box}
+                        aria-label={`${cell.shortLabel} ${cell.status}`}
                       >
-                        {done ? "✓" : null}
+                        {cell.status === "done" ? "✓" : null}
                       </div>
                     </div>
                   );
                 })}
               </div>
-              <p className="mt-5 whitespace-pre-line text-center text-sm leading-relaxed text-[#E8DCC8] sm:text-[15px]">
-                {streakCopy}
+              <p className="mt-5 text-center text-sm font-medium text-[#C9A84C] sm:text-[15px]">
+                🔥 {streakCount} day streak · Best: {bestStreak} days
               </p>
             </section>
 
@@ -262,24 +309,175 @@ export function DashboardView() {
               <h2 className="kai-heading mb-4 text-sm font-semibold tracking-[0.05em]">
                 Goal progress
               </h2>
-              <ul className="space-y-5">
-                {GOALS.map((g) => (
-                  <li key={g.label}>
-                    <div className="mb-1.5 flex items-start justify-between gap-3">
-                      <span className="text-[14px] leading-snug text-[#E8DCC8]">
-                        {g.label}
-                      </span>
-                      <span className="shrink-0 text-sm font-semibold tabular-nums text-[#C9A84C]">
-                        {g.pct}%
-                      </span>
-                    </div>
-                    <KaiProgressBar
-                      pct={g.pct}
-                      barClassName={barGradient(g.pct)}
-                    />
+              <ul className="space-y-6">
+                {dashGoals.length === 0 ? (
+                  <li className="text-sm text-[#E8DCC8]/55">
+                    No goals yet. Add one below or finish onboarding.
                   </li>
-                ))}
+                ) : (
+                  dashGoals.map((g) => {
+                    const due = daysUntilTarget(g.targetDate);
+                    const dueLabel =
+                      due === null
+                        ? ""
+                        : due < 0
+                          ? `Overdue ${Math.abs(due)}d`
+                          : due === 0
+                            ? "Due today"
+                            : `Due in ${due} days`;
+                    return (
+                      <li key={g.id}>
+                        <div className="mb-1.5 flex items-start justify-between gap-3">
+                          <span className="text-[14px] font-medium leading-snug text-[#E8DCC8]">
+                            {g.title}
+                          </span>
+                          <span className="shrink-0 text-sm font-semibold tabular-nums text-[#C9A84C]">
+                            {g.progressPercent}%
+                          </span>
+                        </div>
+                        {dueLabel ? (
+                          <p className="mb-2 text-xs text-[#E8DCC8]/50">
+                            {dueLabel}
+                          </p>
+                        ) : null}
+                        <KaiProgressBar
+                          pct={g.progressPercent}
+                          barClassName={barGradient(g.progressPercent)}
+                        />
+                        <ul className="mt-3 space-y-2">
+                          {g.milestones.map((m, idx) => (
+                            <li key={`${g.id}-m-${idx}`}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  toggleMilestone(g.id, idx);
+                                  setGoalsTick((t) => t + 1);
+                                }}
+                                className="flex w-full items-start gap-2 rounded-lg border border-transparent py-1.5 text-left text-sm transition hover:border-[rgba(201,168,76,0.2)] hover:bg-black/40"
+                              >
+                                <span
+                                  className={
+                                    m.done
+                                      ? "text-[#C9A84C]"
+                                      : "text-[#E8DCC8]/35"
+                                  }
+                                  aria-hidden
+                                >
+                                  {m.done ? "☑️" : "☐"}
+                                </span>
+                                <span
+                                  className={
+                                    m.done
+                                      ? "text-[#E8DCC8]/60 line-through"
+                                      : "text-[#E8DCC8]"
+                                  }
+                                >
+                                  {m.text}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </li>
+                    );
+                  })
+                )}
               </ul>
+              <button
+                type="button"
+                onClick={() => {
+                  const d = new Date();
+                  d.setDate(d.getDate() + 90);
+                  const y = d.getFullYear();
+                  const mo = String(d.getMonth() + 1).padStart(2, "0");
+                  const da = String(d.getDate()).padStart(2, "0");
+                  setNewGoalDate(`${y}-${mo}-${da}`);
+                  setNewGoalTitle("");
+                  setNewM1("");
+                  setNewM2("");
+                  setNewM3("");
+                  setAddGoalOpen(true);
+                }}
+                className="mt-4 text-sm font-semibold text-[#C9A84C] transition hover:text-[#F5E6B3]"
+              >
+                + Add another goal
+              </button>
+              {addGoalOpen && (
+                <div className="mt-4 space-y-3 rounded-xl border border-[rgba(201,168,76,0.2)] bg-black/60 p-4">
+                  <input
+                    value={newGoalTitle}
+                    onChange={(e) => setNewGoalTitle(e.target.value)}
+                    placeholder="Goal title"
+                    className="w-full rounded-lg border border-[rgba(201,168,76,0.25)] bg-black px-3 py-2 text-sm text-[#F5F0E8]"
+                  />
+                  <select
+                    value={newGoalCategory}
+                    onChange={(e) =>
+                      setNewGoalCategory(e.target.value as UserGoal["category"])
+                    }
+                    className="w-full rounded-lg border border-[rgba(201,168,76,0.25)] bg-black px-3 py-2 text-sm text-[#F5F0E8]"
+                  >
+                    <option value="work">Work</option>
+                    <option value="health">Health</option>
+                    <option value="learning">Learning</option>
+                    <option value="personal">Personal</option>
+                  </select>
+                  <label className="block text-xs text-[#E8DCC8]/55">
+                    Target date
+                    <input
+                      type="date"
+                      value={newGoalDate}
+                      onChange={(e) => setNewGoalDate(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-[rgba(201,168,76,0.25)] bg-black px-3 py-2 text-sm text-[#F5F0E8]"
+                    />
+                  </label>
+                  <input
+                    value={newM1}
+                    onChange={(e) => setNewM1(e.target.value)}
+                    placeholder="Milestone 1"
+                    className="w-full rounded-lg border border-[rgba(201,168,76,0.25)] bg-black px-3 py-2 text-sm text-[#F5F0E8]"
+                  />
+                  <input
+                    value={newM2}
+                    onChange={(e) => setNewM2(e.target.value)}
+                    placeholder="Milestone 2"
+                    className="w-full rounded-lg border border-[rgba(201,168,76,0.25)] bg-black px-3 py-2 text-sm text-[#F5F0E8]"
+                  />
+                  <input
+                    value={newM3}
+                    onChange={(e) => setNewM3(e.target.value)}
+                    placeholder="Milestone 3"
+                    className="w-full rounded-lg border border-[rgba(201,168,76,0.25)] bg-black px-3 py-2 text-sm text-[#F5F0E8]"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAddGoalOpen(false)}
+                      className="rounded-lg px-4 py-2 text-sm text-[#E8DCC8]/55"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const t = newGoalTitle.trim();
+                        if (!t || !newGoalDate) return;
+                        addUserGoal({
+                          title: t,
+                          targetDate: newGoalDate,
+                          category: newGoalCategory,
+                          milestones: [newM1, newM2, newM3],
+                        });
+                        setAddGoalOpen(false);
+                        setGoalsTick((x) => x + 1);
+                      }}
+                      className="kai-btn-shimmer ml-auto rounded-lg border border-[rgba(201,168,76,0.45)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] px-4 py-2 text-sm font-semibold text-black/90"
+                    >
+                      Save goal
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
 
             <section className={CARD}>

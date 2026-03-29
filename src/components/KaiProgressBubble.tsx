@@ -10,6 +10,7 @@ import {
   wasMemoryPlayedToday,
   wasWordSolvedToday,
 } from "@/lib/kaiPoints";
+import { ensureStreakProcessed, getLongestStreak } from "@/lib/streakSystem";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -87,10 +88,13 @@ export function KaiProgressBubble() {
     const onResize = () => setPos((p) => clampPos(p));
     window.addEventListener("resize", onResize);
     const onEarn = () => refresh();
+    const onStreak = () => refresh();
     window.addEventListener("kai-points-earned", onEarn);
+    window.addEventListener("kai-streak-updated", onStreak);
     return () => {
       window.removeEventListener("resize", onResize);
       window.removeEventListener("kai-points-earned", onEarn);
+      window.removeEventListener("kai-streak-updated", onStreak);
     };
   }, [refresh]);
 
@@ -104,11 +108,13 @@ export function KaiProgressBubble() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
 
+  ensureStreakProcessed();
   const snapshot = {
     checkin: hasCheckinToday(),
     ptsToday: getPointsEarnedToday(),
     totalPts: getTotalPoints(),
     streak: getConsecutiveCheckinStreak(),
+    best: getLongestStreak(),
     week: getLast7DaysCheckinFlags(),
     wordDone: wasWordSolvedToday(),
     memDone: wasMemoryPlayedToday(),
@@ -268,6 +274,9 @@ export function KaiProgressBubble() {
                     {snapshot.streak} days
                   </span>
                 </div>
+                <p className="mt-1 text-center text-[10px] text-[#E8DCC8]/45">
+                  🔥 {snapshot.streak} day streak · Best: {snapshot.best} days
+                </p>
                 <div className="mt-2 flex justify-between gap-1">
                   {snapshot.week.map((done, i) => (
                     <div

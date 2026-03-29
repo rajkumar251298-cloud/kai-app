@@ -1,11 +1,26 @@
 /** Streak points — localStorage (client-only). */
 
+import {
+  addLocalDays,
+  ensureStreakProcessed,
+  getCheckinHistory,
+  getDisplayedStreak,
+  localDateKey,
+  recordStreakCheckin,
+} from "@/lib/streakSystem";
+
 export const KAI_POINTS_KEY = "kaiTotalPoints";
 export const KAI_HABIT_PROFILE_KEY = "habitProfile";
 export const KAI_HABIT_QUIZ_DONE_KEY = "kaiHabitQuizPointsAwarded";
 
 export function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/** Local calendar date (for check-in streak alignment with streakSystem). */
+export function todayKeyLocal(): string {
+  if (typeof window === "undefined") return todayKey();
+  return localDateKey(new Date());
 }
 
 export function getTotalPoints(): number {
@@ -40,7 +55,7 @@ export function getPointsEarnedToday(): number {
 
 export function hasCheckinToday(): boolean {
   if (typeof window === "undefined") return false;
-  return localStorage.getItem(`kaiDailyCheckin_${todayKey()}`) === "1";
+  return localStorage.getItem(`kaiDailyCheckin_${todayKeyLocal()}`) === "1";
 }
 
 function getCheckinDateSet(): Set<string> {
@@ -104,25 +119,22 @@ export function missedYesterdayOnly(): boolean {
   return !set.has(y) && set.has(y2);
 }
 
-/** Consecutive UTC calendar days with a recorded check-in, ending today. */
+/** Consecutive local calendar days with check-in (Duolingo-style streak). */
 export function getConsecutiveCheckinStreak(): number {
-  const set = getCheckinDateSet();
-  let key = todayKey();
-  let n = 0;
-  while (set.has(key)) {
-    n += 1;
-    key = addUtcDays(key, -1);
-  }
-  return n;
+  if (typeof window === "undefined") return 0;
+  ensureStreakProcessed();
+  return getDisplayedStreak();
 }
 
-/** Seven dots: oldest → newest (rolling week ending today, UTC). */
+/** Seven dots: oldest → newest (rolling week ending today, local). */
 export function getLast7DaysCheckinFlags(): boolean[] {
-  const set = getCheckinDateSet();
-  const t = todayKey();
+  if (typeof window === "undefined") return [];
+  ensureStreakProcessed();
+  const set = new Set(getCheckinHistory());
+  const t = localDateKey(new Date());
   const out: boolean[] = [];
   for (let i = 6; i >= 0; i -= 1) {
-    out.push(set.has(addUtcDays(t, -i)));
+    out.push(set.has(addLocalDays(t, -i)));
   }
   return out;
 }
@@ -271,10 +283,13 @@ export function countCheckinsOnDates(dates: string[]): number {
 
 /** +20 once per calendar day when daily check-in is marked complete (call from chat/home). */
 export function tryAwardDailyCheckin(): boolean {
-  const k = `kaiDailyCheckin_${todayKey()}`;
+  const t = todayKeyLocal();
+  const k = `kaiDailyCheckin_${t}`;
   if (localStorage.getItem(k)) return false;
+  const res = recordStreakCheckin();
+  if (res.alreadyCheckedIn) return false;
   localStorage.setItem(k, "1");
-  recordCheckinDate(todayKey());
+  recordCheckinDate(t);
   bumpTotalCheckins();
   addPoints(20);
   bumpCheckinStreak();

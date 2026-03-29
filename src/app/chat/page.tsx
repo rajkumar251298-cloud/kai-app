@@ -6,8 +6,18 @@ import {
 } from "@/lib/kaiLocalProfile";
 import {
   buildCheckinOpening,
-  DEFAULT_CHECKIN_OPENING,
 } from "@/lib/kaiTodaysFocus";
+import {
+  LS_USER_AGE_GROUP,
+  LS_USER_GOAL_TYPE,
+  stuckOpeningForPersona,
+} from "@/lib/kaiPersona";
+import {
+  getPrimaryGoal,
+  hasRatedGoalProgressToday,
+  markProgressRatedToday,
+  recordDailyGoalProgress,
+} from "@/lib/goalSystem";
 import {
   memoryForApi,
   parseAndApplyKaiMemoryFromReply,
@@ -41,7 +51,7 @@ const STORAGE_KEYS = {
 } as const;
 
 const OPENINGS: Record<ChatMode, string> = {
-  checkin: DEFAULT_CHECKIN_OPENING,
+  checkin: "",
   stuck:
     "Got it — you're blocked. Describe exactly what you're stuck on. The more specific, the faster we solve it.",
   plan:
@@ -198,7 +208,8 @@ function ChatInner() {
     if (mode === "ideas" && topic) {
       return `${OPENINGS.ideas}\n\n(Topic from home: ${topic})`;
     }
-    if (mode === "checkin") return DEFAULT_CHECKIN_OPENING;
+    if (mode === "checkin") return buildCheckinOpening(readKaiMemory());
+    if (mode === "stuck") return stuckOpeningForPersona();
     return OPENINGS[mode];
   });
 
@@ -206,6 +217,8 @@ function ChatInner() {
   const [input, setInput] = useState("");
   const [isAwaitingApi, setIsAwaitingApi] = useState(false);
   const [streaming, setStreaming] = useState<string | null>(null);
+  const [showGoalRating, setShowGoalRating] = useState(false);
+  const [goalRatingNote, setGoalRatingNote] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const checkinPointsAwarded = useRef(false);
 
@@ -226,6 +239,10 @@ function ChatInner() {
     }
     if (mode === "checkin") {
       setOpeningLine(buildCheckinOpening(readKaiMemory()));
+      return;
+    }
+    if (mode === "stuck") {
+      setOpeningLine(stuckOpeningForPersona());
       return;
     }
     setOpeningLine(OPENINGS[mode]);
@@ -275,6 +292,14 @@ function ChatInner() {
         : "";
     const userGoal =
       typeof window !== "undefined" ? getStoredUserGoal() : "";
+    const userAgeGroup =
+      typeof window !== "undefined"
+        ? localStorage.getItem(LS_USER_AGE_GROUP) ?? ""
+        : "";
+    const userGoalType =
+      typeof window !== "undefined"
+        ? localStorage.getItem(LS_USER_GOAL_TYPE) ?? ""
+        : "";
 
     try {
       const res = await fetch("/api/chat", {
@@ -286,6 +311,8 @@ function ChatInner() {
           userGoal,
           chatMode: mode,
           memory: memoryForApi(),
+          userAgeGroup,
+          userGoalType,
         }),
       });
       const data: { reply?: string; error?: string } = await res.json();
@@ -303,6 +330,14 @@ function ChatInner() {
       if (mode === "checkin" && !checkinPointsAwarded.current) {
         checkinPointsAwarded.current = true;
         tryAwardDailyCheckin();
+        const pg = getPrimaryGoal();
+        if (
+          pg &&
+          !hasRatedGoalProgressToday(pg.id)
+        ) {
+          setShowGoalRating(true);
+          setGoalRatingNote(null);
+        }
       }
     } catch (err) {
       setIsAwaitingApi(false);
@@ -365,6 +400,49 @@ function ChatInner() {
 
           <div ref={bottomRef} className="h-px shrink-0" aria-hidden />
         </div>
+
+        {mode === "checkin" && showGoalRating && getPrimaryGoal() && (
+          <div className="shrink-0 border-t border-[rgba(201,168,76,0.15)] bg-[#0a0a0a] px-4 py-4">
+            <p className="mx-auto max-w-lg text-sm leading-relaxed text-[#E8DCC8]">
+              Before you go — on a scale of 1-10, how much did today move you
+              toward{" "}
+              <span className="font-medium text-[#F5F0E8]">
+                {getPrimaryGoal()!.title}
+              </span>
+              ?
+            </p>
+            <div className="mx-auto mt-3 flex max-w-lg flex-wrap gap-2">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  disabled={goalRatingNote !== null}
+                  onClick={() => {
+                    const g = getPrimaryGoal();
+                    if (!g) return;
+                    recordDailyGoalProgress(g.id, n);
+                    markProgressRatedToday(g.id);
+                    setGoalRatingNote(
+                      "Got it. Progress updated. Keep moving. ⚡",
+                    );
+                    window.setTimeout(() => {
+                      setShowGoalRating(false);
+                      setGoalRatingNote(null);
+                    }, 2200);
+                  }}
+                  className="min-h-11 min-w-11 rounded-xl border border-[rgba(201,168,76,0.35)] bg-black text-sm font-semibold text-[#C9A84C] transition hover:border-[rgba(201,168,76,0.55)] disabled:opacity-40"
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            {goalRatingNote && (
+              <p className="mx-auto mt-3 max-w-lg text-sm font-medium text-[#C9A84C]">
+                {goalRatingNote}
+              </p>
+            )}
+          </div>
+        )}
 
         <form
           onSubmit={handleSend}

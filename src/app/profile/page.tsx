@@ -8,13 +8,13 @@ import {
   LevelProgressCard,
 } from "@/components/LevelSystem";
 import {
-  addGoal,
-  loadGoals,
-  markGoalCompleted,
-  removeGoal,
-  updateGoal,
-  type KaiGoal,
-} from "@/lib/kaiGoals";
+  loadUserGoals,
+  markGoalAchieved,
+  removeUserGoal,
+  updateUserGoalTitle,
+  addUserGoal,
+  type UserGoal,
+} from "@/lib/goalSystem";
 import {
   KAI_LS_CHECK_IN_TIME,
   KAI_LS_USER_NAME,
@@ -28,6 +28,7 @@ import {
   habitQuizProfileSaved,
   KAI_HABIT_PROFILE_KEY,
 } from "@/lib/kaiPoints";
+import { getLongestStreak, ensureStreakProcessed } from "@/lib/streakSystem";
 import {
   type BadgeId,
   checkAndAwardBadges,
@@ -89,7 +90,9 @@ export default function ProfilePage() {
   const [userName, setUserName] = useState<string | null>(null);
   const [habitTitle, setHabitTitle] = useState<string | null>(null);
   const [points, setPoints] = useState(0);
-  const [goals, setGoals] = useState<KaiGoal[]>([]);
+  const [goals, setGoals] = useState<UserGoal[]>([]);
+  const [streakUi, setStreakUi] = useState(0);
+  const [longestUi, setLongestUi] = useState(0);
   const [notificationsOn, setNotificationsOn] = useState(true);
   const [soundOn, setSoundOn] = useState(true);
   const [reminderTime, setReminderTime] = useState("09:00");
@@ -110,7 +113,10 @@ export default function ProfilePage() {
     checkAndAwardBadges();
     setEarnedBadges(new Set(loadEarnedBadges()));
     setPoints(getTotalPoints());
-    setGoals(loadGoals());
+    setGoals(loadUserGoals());
+    ensureStreakProcessed();
+    setStreakUi(getConsecutiveCheckinStreak());
+    setLongestUi(getLongestStreak());
     setUserName(localStorage.getItem(K_USER)?.trim() || null);
     try {
       const raw = localStorage.getItem(KAI_HABIT_PROFILE_KEY);
@@ -142,7 +148,12 @@ export default function ProfilePage() {
     });
     const onEarn = () => refreshLocal();
     window.addEventListener("kai-points-earned", onEarn);
-    return () => window.removeEventListener("kai-points-earned", onEarn);
+    const onStreak = () => refreshLocal();
+    window.addEventListener("kai-streak-updated", onStreak);
+    return () => {
+      window.removeEventListener("kai-points-earned", onEarn);
+      window.removeEventListener("kai-streak-updated", onStreak);
+    };
   }, [refreshLocal]);
 
   useEffect(() => {
@@ -166,7 +177,7 @@ export default function ProfilePage() {
     };
   }, []);
 
-  const streak = getConsecutiveCheckinStreak();
+  const streak = streakUi;
   const checkins = getTotalCheckins();
   const gamesN = getGamesPlayedTotal();
   const quizDone = habitQuizProfileSaved();
@@ -224,11 +235,21 @@ export default function ProfilePage() {
     if (!t) return;
     if (!goalModal) return;
     if (goalModal.mode === "add") {
-      addGoal(t);
+      const d = new Date();
+      d.setDate(d.getDate() + 90);
+      const y = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, "0");
+      const da = String(d.getDate()).padStart(2, "0");
+      addUserGoal({
+        title: t,
+        targetDate: `${y}-${mo}-${da}`,
+        category: "work",
+        milestones: ["Milestone 1", "Milestone 2", "Milestone 3"],
+      });
     } else {
-      updateGoal(goalModal.id, t);
+      updateUserGoalTitle(goalModal.id, t);
     }
-    setGoals(loadGoals());
+    setGoals(loadUserGoals());
     setGoalModal(null);
     setGoalDraft("");
   };
@@ -432,14 +453,17 @@ export default function ProfilePage() {
                   className="flex min-h-[44px] items-center gap-2 rounded-xl border border-[rgba(201,168,76,0.15)] bg-black px-3 py-2"
                 >
                   <span className="min-w-0 flex-1 text-sm text-[#E8DCC8]">
-                    {g.text}
+                    <span className="font-medium">{g.title}</span>
+                    <span className="ml-2 tabular-nums text-[#C9A84C]/90">
+                      {g.progressPercent}%
+                    </span>
                   </span>
                   <button
                     type="button"
                     className="shrink-0 rounded-lg border border-[rgba(201,168,76,0.25)] px-3 py-2 text-xs font-medium text-[#E8DCC8]/80"
                     onClick={() => {
-                      markGoalCompleted(g.id);
-                      setGoals(loadGoals());
+                      markGoalAchieved(g.id);
+                      setGoals(loadUserGoals());
                       checkAndAwardBadges();
                       setEarnedBadges(new Set(loadEarnedBadges()));
                     }}
@@ -450,8 +474,8 @@ export default function ProfilePage() {
                     type="button"
                     className="shrink-0 rounded-lg border border-[rgba(201,168,76,0.35)] px-3 py-2 text-xs font-medium text-[#C9A84C]"
                     onClick={() => {
-                      setGoalModal({ mode: "edit", id: g.id, text: g.text });
-                      setGoalDraft(g.text);
+                      setGoalModal({ mode: "edit", id: g.id, text: g.title });
+                      setGoalDraft(g.title);
                     }}
                   >
                     Edit
@@ -528,6 +552,12 @@ export default function ProfilePage() {
               <span className="font-semibold text-[#C9A84C]">{streak} days</span>
             </li>
             <li className="flex justify-between gap-2 border-b border-[rgba(201,168,76,0.08)] py-2">
+              <span>Best streak</span>
+              <span className="font-semibold tabular-nums text-[#C9A84C]">
+                {longestUi} days
+              </span>
+            </li>
+            <li className="flex justify-between gap-2 border-b border-[rgba(201,168,76,0.08)] py-2">
               <span>Total check-ins</span>
               <span className="font-semibold tabular-nums text-[#C9A84C]">
                 {checkins}
@@ -553,6 +583,12 @@ export default function ProfilePage() {
             Support
           </h2>
           <div className="space-y-2">
+            <Link
+              href="/about"
+              className={`${BTN_ROW} !justify-center`}
+            >
+              About KAI
+            </Link>
             <a href={CONTACT_US_MAILTO} className={`${BTN_ROW} !justify-center`}>
               Contact us
             </a>
@@ -698,8 +734,8 @@ export default function ProfilePage() {
                 type="button"
                 className="text-sm text-red-400/90"
                 onClick={() => {
-                  removeGoal(goalModal.id);
-                  setGoals(loadGoals());
+                  removeUserGoal(goalModal.id);
+                  setGoals(loadUserGoals());
                   setGoalModal(null);
                 }}
               >

@@ -1,76 +1,50 @@
-/** User goals — localStorage (client-only). */
+/** @deprecated Use goalSystem — thin bridge for legacy imports. */
+
+import {
+  addUserGoal,
+  loadUserGoals,
+  removeUserGoal,
+  updateUserGoalTitle,
+} from "@/lib/goalSystem";
 
 export type KaiGoal = { id: string; text: string };
 
-const KAI_GOALS_KEY = "kaiGoals";
-const LEGACY_USER_GOAL = "userGoal";
-const LEGACY_MAIN_GOAL = "mainGoal";
-
-function newId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
 export function loadGoals(): KaiGoal[] {
   if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(KAI_GOALS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as unknown;
-      if (Array.isArray(parsed)) {
-        return parsed
-          .filter(
-            (g): g is KaiGoal =>
-              g &&
-              typeof g === "object" &&
-              typeof (g as KaiGoal).id === "string" &&
-              typeof (g as KaiGoal).text === "string",
-          )
-          .map((g) => ({ id: g.id, text: g.text.trim() }))
-          .filter((g) => g.text.length > 0);
-      }
-    }
-    const legacy =
-      localStorage.getItem(LEGACY_USER_GOAL)?.trim() ||
-      localStorage.getItem(LEGACY_MAIN_GOAL)?.trim();
-    if (legacy) {
-      const migrated: KaiGoal[] = [{ id: "legacy-main-goal", text: legacy }];
-      localStorage.setItem(KAI_GOALS_KEY, JSON.stringify(migrated));
-      return migrated;
-    }
-  } catch {
-    /* ignore */
-  }
-  return [];
+  return loadUserGoals().map((g) => ({ id: g.id, text: g.title }));
 }
 
-export function saveGoals(goals: KaiGoal[]): void {
-  localStorage.setItem(KAI_GOALS_KEY, JSON.stringify(goals));
+export function saveGoals(_goals: KaiGoal[]): void {
+  /* no-op: use goalSystem.saveGoals */
 }
 
 export function addGoal(text: string): KaiGoal {
-  const g: KaiGoal = { id: newId(), text: text.trim() };
-  const list = loadGoals();
-  list.push(g);
-  saveGoals(list);
-  return g;
+  const d = new Date();
+  d.setDate(d.getDate() + 90);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const g = addUserGoal({
+    title: text.trim(),
+    targetDate: `${y}-${m}-${day}`,
+    category: "work",
+    milestones: ["Milestone 1", "Milestone 2", "Milestone 3"],
+  });
+  return { id: g.id, text: g.title };
 }
 
 export function updateGoal(id: string, text: string): void {
-  const list = loadGoals().map((g) =>
-    g.id === id ? { ...g, text: text.trim() } : g,
-  );
-  saveGoals(list);
+  updateUserGoalTitle(id, text);
 }
 
 export function removeGoal(id: string): void {
-  saveGoals(loadGoals().filter((g) => g.id !== id));
+  removeUserGoal(id);
 }
 
 const KAI_GOAL_CRUSHER_KEY = "kaiGoalCrusherBadge";
 
-/** Call when user marks a goal complete (badge + removal). */
 export function markGoalCompleted(id: string): void {
-  removeGoal(id);
+  removeUserGoal(id);
   if (typeof window !== "undefined") {
     localStorage.setItem(KAI_GOAL_CRUSHER_KEY, "1");
   }

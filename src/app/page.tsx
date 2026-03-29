@@ -5,6 +5,10 @@ import { WelcomeSplash } from "@/components/WelcomeSplash";
 import { getStoredUserGoal } from "@/lib/kaiLocalProfile";
 import { writeKaiMemory } from "@/lib/kaiMemory";
 import {
+  homeGreetingSubtitle,
+  personaFocusSubtitle,
+} from "@/lib/kaiPersona";
+import {
   getTodaysFocus,
   type TodaysFocusResult,
 } from "@/lib/kaiTodaysFocus";
@@ -71,7 +75,8 @@ export default function Home() {
   const [showSplash, setShowSplash] = useState(true);
   const onSplashComplete = useCallback(() => setShowSplash(false), []);
   const [greetingLine, setGreetingLine] = useState("Good morning, there.");
-  const [daySubtitle, setDaySubtitle] = useState("Let's make today count.");
+  const [daySubtitle, setDaySubtitle] = useState("Entrepreneur · 0 day streak 🔥");
+  const [personaLine, setPersonaLine] = useState("Let's make today count.");
   const [brainstormOpen, setBrainstormOpen] = useState(false);
   const [brainstormTopic, setBrainstormTopic] = useState("");
   const [moreOpen, setMoreOpen] = useState(false);
@@ -83,20 +88,31 @@ export default function Home() {
     getTodaysFocus(""),
   );
 
-  useEffect(() => {
-    queueMicrotask(() => {
-      try {
-        const stored = localStorage.getItem("userName")?.trim();
-        const who = stored && stored.length > 0 ? stored : "there";
-        const { greeting, subtitle } = greetingForTime(new Date());
-        setGreetingLine(`${greeting}, ${who}.`);
-        setDaySubtitle(subtitle);
-      } catch {
-        setGreetingLine("Good morning, there.");
-        setDaySubtitle("Let's make today count.");
-      }
-    });
+  const refreshGreeting = useCallback(() => {
+    try {
+      const stored = localStorage.getItem("userName")?.trim();
+      const who = stored && stored.length > 0 ? stored : "there";
+      const { greeting } = greetingForTime(new Date());
+      setGreetingLine(`${greeting}, ${who}.`);
+      setDaySubtitle(homeGreetingSubtitle());
+      setPersonaLine(personaFocusSubtitle());
+    } catch {
+      setGreetingLine("Good morning, there.");
+      setDaySubtitle(homeGreetingSubtitle());
+      setPersonaLine(personaFocusSubtitle());
+    }
   }, []);
+
+  useEffect(() => {
+    queueMicrotask(refreshGreeting);
+    const onStreak = () => queueMicrotask(refreshGreeting);
+    window.addEventListener("kai-streak-updated", onStreak);
+    window.addEventListener("focus", onStreak);
+    return () => {
+      window.removeEventListener("kai-streak-updated", onStreak);
+      window.removeEventListener("focus", onStreak);
+    };
+  }, [refreshGreeting]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -149,6 +165,7 @@ export default function Home() {
             {greetingLine}
           </h1>
           <p className="mt-2 text-sm text-[#E8DCC8]">{daySubtitle}</p>
+          <p className="mt-1 text-xs text-[#E8DCC8]/60">{personaLine}</p>
         </motion.div>
 
         <motion.section

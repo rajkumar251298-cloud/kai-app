@@ -59,34 +59,62 @@ I'm expecting this done today.
 OR: Don't break the streak.
 OR: Let's see if you actually follow through.`;
 
+function personaBlock(age: string, goalType: string): string {
+  const a = age.trim().toLowerCase();
+  const g = goalType.trim().toLowerCase();
+  if (a === "student" || g === "study") {
+    return `The user is a student focused on study and exams. Speak like a strict but caring tutor who wants them to pass. Reference exams, chapters, and concepts. Push for specificity.`;
+  }
+  if (a === "building" || g === "startup") {
+    return `The user is building a product or business. Speak like a no-BS founder mentor. Reference shipping, users, revenue, and growth.`;
+  }
+  if (a === "early_career" || g === "career") {
+    return `The user is growing their career. Speak like an ambitious senior colleague who genuinely wants them to level up.`;
+  }
+  if (a === "senior") {
+    return `The user is a senior professional or leader. Speak as a peer. No hand-holding. Direct, strategic, executive-level.`;
+  }
+  if (g === "health") {
+    return `The user cares about health and personal habits. Be direct about consistency and honest tracking — no toxic positivity.`;
+  }
+  return "";
+}
+
 function buildSystemPrompt(
   chatMode: ChatMode,
   userName: string,
   userGoal: string,
   memory: KaiMemory,
+  userAgeGroup: string,
+  userGoalType: string,
 ): string {
   const memoryBlock = formatMemoryBlock(memory);
   const memSection = `--- Accountability memory (use in your tone; reference honestly) ---\n${memoryBlock}`;
+  const persona = personaBlock(userAgeGroup, userGoalType);
+  const personaSection = persona
+    ? `--- User context ---\n${persona}\nuserAgeGroup: ${userAgeGroup || "(not set)"}\nuserGoalType: ${userGoalType || "(not set)"}\n`
+    : "";
 
   switch (chatMode) {
     case "checkin":
       return `${CHECKIN_CORE}
-
+${personaSection}
 User name: ${userName}
 90-day goal: ${userGoal}
 
 ${memSection}`;
     case "stuck":
       return `You are KAI. The user is blocked — they need traction, not empathy theater.
+${personaSection}
 ${memSection}
 
 Give exactly 3 numbered concrete options they can try in the next 30 minutes. Decisive, no generic advice.
 2–4 sentences of setup + the list. Then ask which one they pick — and COMMIT line when they choose.`;
     case "plan":
-      return `You are KAI reviewing their plan. ${memSection}
+      return `You are KAI reviewing their plan. ${personaSection}${memSection}
 Find gaps, risks, and fantasy scheduling. Honest, brief (2–4 sentences per turn). No softening.`;
     case "ideas":
-      return `You are KAI brainstorming. ${memSection}
+      return `You are KAI brainstorming. ${personaSection}${memSection}
 4–6 bold, specific ideas as a numbered list; each = one punchy line + one line why it works.
 2–4 sentences framing. End asking which to go deeper on.`;
     default: {
@@ -115,12 +143,16 @@ export async function POST(req: Request) {
       userGoal,
       chatMode,
       memory,
+      userAgeGroup,
+      userGoalType,
     }: {
       messages?: unknown;
       userName?: unknown;
       userGoal?: unknown;
       chatMode?: unknown;
       memory?: unknown;
+      userAgeGroup?: unknown;
+      userGoalType?: unknown;
     } = body;
 
     if (!Array.isArray(messages)) {
@@ -189,11 +221,17 @@ export async function POST(req: Request) {
 
     const client = new Anthropic({ apiKey });
     const mem = normalizeMemory(memory);
+    const ageStr =
+      typeof userAgeGroup === "string" ? userAgeGroup : "";
+    const goalTypeStr =
+      typeof userGoalType === "string" ? userGoalType : "";
     const system = buildSystemPrompt(
       chatMode as ChatMode,
       userName,
       userGoal,
       mem,
+      ageStr,
+      goalTypeStr,
     );
 
     const response = await client.messages.create({

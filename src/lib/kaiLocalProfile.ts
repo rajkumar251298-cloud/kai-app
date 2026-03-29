@@ -3,6 +3,11 @@
  * Legacy keys remain readable for one release.
  */
 
+import {
+  getPrimaryGoal,
+  syncLegacyUserGoalToUserGoals,
+} from "@/lib/goalSystem";
+
 export const KAI_LS_USER_NAME = "userName";
 export const KAI_LS_USER_GOAL = "userGoal";
 export const KAI_LS_CHECK_IN_TIME = "checkInTime";
@@ -12,6 +17,9 @@ const LEGACY_CHECK_IN_TIME = "checkinTime";
 
 export function getStoredUserGoal(): string {
   if (typeof window === "undefined") return "";
+  syncLegacyUserGoalToUserGoals();
+  const fromStructured = getPrimaryGoal()?.title?.trim();
+  if (fromStructured) return fromStructured;
   return (
     localStorage.getItem(KAI_LS_USER_GOAL)?.trim() ||
     localStorage.getItem(LEGACY_USER_GOAL)?.trim() ||
