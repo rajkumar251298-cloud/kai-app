@@ -14,6 +14,13 @@ import {
   setStoredUserAgeGroup,
   setStoredUserGoalType,
 } from "@/lib/kaiPersona";
+import {
+  LS_KAI_PERSONA,
+  LS_USER_GENDER,
+  PERSONA_OPTIONS,
+  type KaiPersonaId,
+  type UserGenderPref,
+} from "@/lib/kaiRelationshipPersona";
 import Link from "next/link";
 import {
   FormEvent,
@@ -137,6 +144,8 @@ type Phase =
   | "intro"
   | "wait_name"
   | "wait_self_pick"
+  | "wait_persona"
+  | "wait_gender"
   | "wait_goal_text"
   | "wait_vision"
   | "wait_blocker"
@@ -153,6 +162,7 @@ export default function OnboardingPage() {
   const [isKaiTyping, setIsKaiTyping] = useState(true);
   const [input, setInput] = useState("");
   const [userFirstName, setUserFirstName] = useState("");
+  const [selectedSelfId, setSelectedSelfId] = useState<SelfId | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const onTextareaInput = useAutoGrowTextarea();
@@ -312,8 +322,41 @@ export default function OnboardingPage() {
       setStoredUserAgeGroup(opt.age);
       setStoredUserGoalType(opt.goalType);
     }
+    setSelectedSelfId(opt.id);
+    setPhase("wait_persona");
+    const who = userFirstName.trim() || "there";
+    await pushKai(
+      `One more thing ${who} — everyone responds differently to support. How would you like me to show up for you on hard days?`,
+    );
+  };
+
+  const pickPersona = async (id: KaiPersonaId) => {
+    if (phase !== "wait_persona" || isKaiTyping) return;
+    const opt = PERSONA_OPTIONS.find((o) => o.id === id);
+    pushUser(opt ? `${opt.emoji} ${opt.title}` : id);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(LS_KAI_PERSONA, id);
+    }
+    setPhase("wait_gender");
+    await pushKai(
+      `One tiny thing — just so I can talk to you naturally — how do you identify?`,
+    );
+  };
+
+  const pickGender = async (g: UserGenderPref) => {
+    if (phase !== "wait_gender" || isKaiTyping) return;
+    const labels: Record<UserGenderPref, string> = {
+      male: "He / Him",
+      female: "She / Her",
+      neutral: "They / Them or prefer not to say",
+    };
+    pushUser(labels[g]);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(LS_USER_GENDER, g);
+    }
+    const sid = selectedSelfId ?? "starting";
     setPhase("wait_goal_text");
-    await pushKai(MSG_5_BY_SELF[opt.id]);
+    await pushKai(MSG_5_BY_SELF[sid]);
   };
 
   const showTextInput =
@@ -359,6 +402,50 @@ export default function OnboardingPage() {
                   className="kai-btn-shimmer rounded-xl border border-[rgba(201,168,76,0.35)] bg-black px-3 py-3 text-left text-sm font-medium leading-snug text-[#E8DCC8] transition hover:border-[rgba(201,168,76,0.55)]"
                 >
                   {o.emoji} {o.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {phase === "wait_persona" && !isKaiTyping && (
+            <div className="kai-msg-animate grid max-w-lg grid-cols-1 gap-2 pt-1 pl-[52px] pr-2 sm:grid-cols-2">
+              {PERSONA_OPTIONS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => void pickPersona(p.id)}
+                  className="kai-btn-shimmer flex flex-col items-start gap-1 rounded-xl border border-[rgba(201,168,76,0.35)] bg-black px-3 py-3 text-left transition hover:border-[rgba(201,168,76,0.55)]"
+                >
+                  <span className="text-base font-semibold text-[#F5F0E8]">
+                    {p.emoji} {p.title}
+                  </span>
+                  <span className="text-xs leading-snug text-[#E8DCC8]/75">
+                    {p.description}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {phase === "wait_gender" && !isKaiTyping && (
+            <div className="kai-msg-animate flex max-w-lg flex-col gap-2 pt-1 pl-[52px] pr-2">
+              {(
+                [
+                  ["male", "He / Him"],
+                  ["female", "She / Her"],
+                  [
+                    "neutral",
+                    "They / Them or prefer not to say",
+                  ],
+                ] as const
+              ).map(([g, label]) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => void pickGender(g)}
+                  className="kai-btn-shimmer rounded-xl border border-[rgba(201,168,76,0.35)] bg-black px-4 py-3 text-left text-sm font-medium text-[#E8DCC8] transition hover:border-[rgba(201,168,76,0.55)]"
+                >
+                  {label}
                 </button>
               ))}
             </div>

@@ -169,8 +169,8 @@ export function processStreakOnAppLoad(): StreakLoadResult {
     localStorage.setItem(LS_LAST, latest);
   }
 
-  let last = localStorage.getItem(LS_LAST)?.trim() || "";
-  let current = readInt(LS_CURRENT, 0);
+  const last = localStorage.getItem(LS_LAST)?.trim() || "";
+  const current = readInt(LS_CURRENT, 0);
   const longest = readInt(LS_LONGEST, 0);
 
   if (!last) {
@@ -258,7 +258,7 @@ export function recordStreakCheckin(): RecordCheckinResult {
   }
 
   const yesterday = addLocalDays(today, -1);
-  let current = readInt(LS_CURRENT, 0);
+  const current = readInt(LS_CURRENT, 0);
   const longest = readInt(LS_LONGEST, 0);
   const last = localStorage.getItem(LS_LAST)?.trim() || "";
 

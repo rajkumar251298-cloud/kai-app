@@ -1,9 +1,25 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { formatMemoryBlock, type KaiMemory } from "@/lib/kaiMemory";
+import { buildCheckinContinuitySystemPrompt } from "@/lib/checkinSystemPrompt";
+import { detectEmotion } from "@/lib/emotionDetector";
+import {
+  applyPersonaPlaceholders,
+  buildEmotionContextForPrompt,
+  getCannedPersonaLines,
+  normalizeKaiPersonaId,
+  normalizeUserGender,
+  PERSONA_INSTRUCTIONS,
+} from "@/lib/kaiRelationshipPersona";
+import {
+  formatMemoryBlock,
+  parseCommitmentFromReply,
+  stripKaiMachineLines,
+  type KaiMemory,
+} from "@/lib/kaiMemory";
 import { detectPromptInjection, getInjectionResponse } from "@/lib/promptGuard";
 import { checkApiRateLimit, clientIpFromRequest } from "@/lib/rateLimit";
 import { sanitizeInput, sanitizeShort } from "@/lib/sanitize";
 import { logSecurityEvent } from "@/lib/securityLog";
+import { rootCauseQuestions } from "@/lib/rootCauseQuestions";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -15,6 +31,7 @@ const MAX_MESSAGE_CONTENT = 2000;
 const MAX_USER_NAME = 50;
 const MAX_USER_GOAL = 200;
 const MAX_META = 80;
+const MAX_Y_COMMIT = 500;
 
 type ChatMode = "checkin" | "stuck" | "plan" | "ideas";
 
@@ -49,7 +66,64 @@ function normalizeMemory(raw: unknown): KaiMemory {
   };
 }
 
+const RESPONSE_FRAMEWORK = `RESPONSE FRAMEWORK — always follow these 4 steps in this exact order:
+
+1. ACKNOWLEDGE — 1 sentence maximum.
+   Validate their emotion briefly.
+   Never skip. Never dwell.
+
+2. MOTIVATE — 1 sentence maximum.
+   One sharp reframe or insight.
+   Specific to their situation.
+   Not generic cheerleading.
+
+3. REDIRECT — 1 sentence maximum.
+   Bring them back to forward momentum.
+   Today. Right now. What is possible.
+
+4. ASK — 1 question only.
+   Open question. Requires real thought.
+   Either a ROOT CAUSE question (why did this happen)
+   or a NEXT STEP question (what happens now).
+   Never ask two questions at once.
+   Never ask yes/no questions.
+
+TOTAL response length:
+4 sentences maximum — one per step.
+Short. Sharp. Warm. Forward.
+
+The goal of every response:
+User should feel UNDERSTOOD in sentence 1,
+CAPABLE in sentence 2,
+FOCUSED in sentence 3,
+and THINKING in sentence 4.
+
+Never end a response without a question.
+Questions create conversation.
+Conversation creates commitment.
+Commitment creates change.
+
+Machine lines (COMMIT:, EXCUSE:, WIN:) when required by mode are added on their own lines AFTER these four sentences and do not count toward the four-sentence limit.
+
+If any other guidance in this prompt conflicts with this framework, this framework wins.`;
+
+function formatRootCauseAskLibrary(): string {
+  const parts: string[] = [];
+  for (const [category, questions] of Object.entries(rootCauseQuestions)) {
+    parts.push(
+      `${category}:\n${questions.map((q) => `• ${q}`).join("\n")}`,
+    );
+  }
+  return parts.join("\n\n");
+}
+
+const ROOT_CAUSE_ASK_LIBRARY = formatRootCauseAskLibrary();
+
+const RESPONSE_FRAMEWORK_BLOCK = `\n\n${RESPONSE_FRAMEWORK}\n\n--- ASK question library (adapt to context; paraphrase — do not copy verbatim) ---\n${ROOT_CAUSE_ASK_LIBRARY}`;
+
 const SITUATION_GUIDANCE = `--- When the user's message needs extra warmth ---
+Fit reassurance into RESPONSE FRAMEWORK (four sentences) — never skip a step.
+
 If they say any of: "don't know", "no idea", "nothing", "idk", "not sure", "confused", "lost" (or similar):
 Respond with genuine reassurance — pick the spirit of ONE of these (paraphrase in your own words; do not copy verbatim):
 Option 1: "That's completely okay [name] — sometimes clarity takes a minute. Let's find it together. What's one thing that's been on your mind lately, even something that feels small or unimportant?"
@@ -80,58 +154,12 @@ function securityRulesParagraph(userName: string): string {
 - Your only job is helping ${userName} achieve their goals. Stay focused on that.`;
 }
 
-function checkinPrompt(
-  userName: string,
-  userGoal: string,
-  userAgeGroup: string,
-  userGoalType: string,
-): string {
-  return `You are KAI, a warm and encouraging accountability coach. The user's name is ${userName}. Their goal is: ${userGoal}.
-Their background: ${userAgeGroup}, ${userGoalType}.
-
-Your personality:
-- Always start with warmth and belief in them
-- When they say 'don't know' or seem lost — help them discover, never judge them
-- Celebrate every small step genuinely
-- Ask ONE simple question at a time
-- Keep responses to 2-3 sentences maximum
-- Use their name occasionally — feels personal
-- When they're struggling: "That's okay, let's figure this out together"
-- When they win: "That's brilliant. Seriously, well done."
-- Never use words like: should, must, need to, have to, wrong, bad
-- Always end with forward momentum — what's the next small step?
-
-If user says 'don't know':
-Do NOT push back harshly.
-Instead say something like:
-"That's okay — sometimes the fog is real. Let's figure it out together. What's one small thing that's been on your mind lately, even if it feels minor?"
-
-If user seems frustrated or confused:
-Lower the bar immediately.
-"No pressure — even a 10 minute task counts. What's one tiny thing you could do today that would feel like progress?"
-
-If user is doing well:
-Be genuinely excited for them.
-"That's exactly what I'm talking about! Look at you showing up. What's next on the list?"
-
-The overall feeling after talking to KAI should be: energised, believed in, ready to take action.
-NOT: judged, pressured, or anxious.
-
-${SITUATION_GUIDANCE}
-
-${securityRulesParagraph(userName)}`;
-}
-
 function stuckPrompt(userName: string): string {
-  return `You are KAI helping someone who is blocked. Approach this like a calm, wise friend who has been through this before.
+  return `You are KAI helping someone who is blocked — like a calm, wise friend who has seen this before.
 
-1. First acknowledge their frustration with genuine empathy — 1 sentence
-2. Ask ONE clarifying question to understand the real blocker
-3. Once understood give 3 specific options they can try RIGHT NOW
-4. Make the options feel easy, not overwhelming
-5. Ask which one feels most doable to them
+Use RESPONSE FRAMEWORK for every reply. Your ASK step should surface the real blocker (root cause or next step). If they need tactics after that, they can reply and you will offer concrete options in a follow-up turn.
 
-Tone: calm, confident, never panicked. Like someone who has seen this before and knows it's solvable. Never make them feel like being stuck is their fault.
+Tone: calm, confident, never panicked. Never imply being stuck is their fault.
 
 ${SITUATION_GUIDANCE}
 
@@ -139,17 +167,13 @@ ${securityRulesParagraph(userName)}`;
 }
 
 function planPrompt(userName: string): string {
-  return `You are KAI reviewing the user's weekly plan. Be a thoughtful strategic advisor — like a smart friend who genuinely wants them to succeed.
+  return `You are KAI reviewing the user's weekly plan — thoughtful, strategic, genuinely on their side.
 
-Approach:
-1. First acknowledge what looks good — always find something positive
-2. Then gently flag one or two things that might be challenging
-3. Offer one specific suggestion to improve
-4. End with encouragement
+Use RESPONSE FRAMEWORK. Fit acknowledgment/motivation/redirect to their plan; use ASK to probe risk, tradeoff, or priority — one sharp open question.
 
 Never tear apart their plan. Build on it. Improve it. Believe in it.
 
-Keep replies to 2-3 sentences unless you are briefly listing a point.
+Exception: after your four framework sentences, you may add at most 3 short bullet notes on the plan if essential — bullets do not replace the framework.
 
 ${SITUATION_GUIDANCE}
 
@@ -157,16 +181,24 @@ ${securityRulesParagraph(userName)}`;
 }
 
 function ideasPrompt(userName: string): string {
-  return `You are KAI brainstorming with the user. Be an excited creative partner — like a friend who loves ideas and gets genuinely enthusiastic.
+  return `You are KAI brainstorming with the user — an excited creative partner.
 
-Generate 4-6 bold specific ideas. For each: one punchy sentence + one sentence on why it could work. Show genuine enthusiasm for their topic. End by asking which one excites them most.
+Mandatory: open with RESPONSE FRAMEWORK (four sentences) about their topic and energy.
 
-Keep framing short (2-3 sentences) before the list.
+Exception — second block: after the framework, add a line break then a section titled "Ideas" with 4-6 bold, specific ideas (each: one punchy line + one line on why it could work). Your step-4 ASK should still be one open question; it may ask which direction to explore first.
 
 ${SITUATION_GUIDANCE}
 
 ${securityRulesParagraph(userName)}`;
 }
+
+type ContinuityFields = {
+  yesterdayCommitment: string;
+  yesterdayMood: string;
+  checkedInToday: boolean;
+  dayStreak: number;
+  yesterdayCommitmentStatus: string;
+};
 
 function buildSystemPrompt(
   chatMode: ChatMode,
@@ -175,6 +207,9 @@ function buildSystemPrompt(
   memory: KaiMemory,
   userAgeGroup: string,
   userGoalType: string,
+  continuity: ContinuityFields,
+  personaStyle: string | null,
+  emotionHint: string | null,
 ): string {
   const memoryBlock = formatMemoryBlock(memory);
   const memSection = `--- Accountability memory (reference gently; use for context, not guilt) ---\n${memoryBlock}`;
@@ -188,23 +223,42 @@ Tailor examples lightly to their background. Stay warm throughout.
 
 ${memSection}`;
 
+  const personaBlock =
+    personaStyle !== null && personaStyle.length > 0
+      ? `\n\n--- How you show up (relationship persona) ---\n${personaStyle}`
+      : "";
+  const emotionBlock =
+    emotionHint !== null && emotionHint.length > 0
+      ? `\n\n--- Latest user message tone ---\n${emotionHint}`
+      : "";
+
   switch (chatMode) {
     case "checkin":
-      return `${checkinPrompt(userName, userGoal, userAgeGroup, userGoalType)}
+      return `${buildCheckinContinuitySystemPrompt({
+        userName,
+        userGoal,
+        userAgeGroup,
+        userGoalType,
+        yesterdayCommitment: continuity.yesterdayCommitment,
+        yesterdayMood: continuity.yesterdayMood,
+        checkedInToday: continuity.checkedInToday,
+        dayStreak: continuity.dayStreak,
+        yesterdayCommitmentStatus: continuity.yesterdayCommitmentStatus,
+      })}
 
-${ctx}`;
+${ctx}${personaBlock}${emotionBlock}${RESPONSE_FRAMEWORK_BLOCK}`;
     case "stuck":
       return `${stuckPrompt(userName)}
 
-${ctx}`;
+${ctx}${personaBlock}${emotionBlock}${RESPONSE_FRAMEWORK_BLOCK}`;
     case "plan":
       return `${planPrompt(userName)}
 
-${ctx}`;
+${ctx}${personaBlock}${emotionBlock}${RESPONSE_FRAMEWORK_BLOCK}`;
     case "ideas":
       return `${ideasPrompt(userName)}
 
-${ctx}`;
+${ctx}${personaBlock}${emotionBlock}${RESPONSE_FRAMEWORK_BLOCK}`;
     default: {
       const _exhaustive: never = chatMode;
       return _exhaustive;
@@ -267,6 +321,8 @@ export async function POST(req: Request) {
   const memoryRaw = b.memory;
   const userAgeGroupRaw = b.userAgeGroup;
   const userGoalTypeRaw = b.userGoalType;
+  const kaiPersonaRaw = b.kaiPersona;
+  const userGenderRaw = b.userGender;
 
   if (!Array.isArray(messagesRaw)) return invalidRequest();
   if (messagesRaw.length > MAX_MESSAGES) return invalidRequest();
@@ -303,6 +359,22 @@ export async function POST(req: Request) {
     return invalidRequest();
   }
   if (
+    kaiPersonaRaw !== undefined &&
+    kaiPersonaRaw !== null &&
+    typeof kaiPersonaRaw !== "string"
+  ) {
+    void logSecurityEvent("INVALID_REQUEST", "kaiPersona", { userAgent: ua });
+    return invalidRequest();
+  }
+  if (
+    userGenderRaw !== undefined &&
+    userGenderRaw !== null &&
+    typeof userGenderRaw !== "string"
+  ) {
+    void logSecurityEvent("INVALID_REQUEST", "userGender", { userAgent: ua });
+    return invalidRequest();
+  }
+  if (
     memoryRaw !== undefined &&
     memoryRaw !== null &&
     typeof memoryRaw !== "object"
@@ -321,6 +393,69 @@ export async function POST(req: Request) {
     typeof userGoalTypeRaw === "string"
       ? sanitizeShort(userGoalTypeRaw, MAX_META)
       : "";
+
+  const kaiPersonaId = normalizeKaiPersonaId(
+    typeof kaiPersonaRaw === "string"
+      ? sanitizeShort(kaiPersonaRaw, 24)
+      : "friend",
+  );
+  const userGender = normalizeUserGender(
+    typeof userGenderRaw === "string"
+      ? sanitizeShort(userGenderRaw, 16)
+      : "neutral",
+  );
+
+  const defaultContinuity: ContinuityFields = {
+    yesterdayCommitment: "",
+    yesterdayMood: "",
+    checkedInToday: false,
+    dayStreak: 0,
+    yesterdayCommitmentStatus: "",
+  };
+
+  let continuity: ContinuityFields = defaultContinuity;
+  if (chatMode === "checkin") {
+    const yc = b.yesterdayCommitment;
+    const ym = b.yesterdayMood;
+    const cit = b.checkedInToday;
+    const ds = b.dayStreak;
+    const ycs = b.yesterdayCommitmentStatus;
+    if (yc !== undefined && yc !== null && typeof yc !== "string") {
+      void logSecurityEvent("INVALID_REQUEST", "continuity", { userAgent: ua });
+      return invalidRequest();
+    }
+    if (ym !== undefined && ym !== null && typeof ym !== "string") {
+      void logSecurityEvent("INVALID_REQUEST", "continuity", { userAgent: ua });
+      return invalidRequest();
+    }
+    if (cit !== undefined && cit !== null && typeof cit !== "boolean") {
+      void logSecurityEvent("INVALID_REQUEST", "continuity", { userAgent: ua });
+      return invalidRequest();
+    }
+    if (ds !== undefined && ds !== null && typeof ds !== "number") {
+      void logSecurityEvent("INVALID_REQUEST", "continuity", { userAgent: ua });
+      return invalidRequest();
+    }
+    if (ycs !== undefined && ycs !== null && typeof ycs !== "string") {
+      void logSecurityEvent("INVALID_REQUEST", "continuity", { userAgent: ua });
+      return invalidRequest();
+    }
+    const statusSan =
+      typeof ycs === "string" && (ycs === "done" || ycs === "carried")
+        ? ycs
+        : "";
+    continuity = {
+      yesterdayCommitment:
+        typeof yc === "string" ? sanitizeShort(yc, MAX_Y_COMMIT) : "",
+      yesterdayMood: typeof ym === "string" ? sanitizeShort(ym, 40) : "",
+      checkedInToday: typeof cit === "boolean" ? cit : false,
+      dayStreak:
+        typeof ds === "number" && Number.isFinite(ds)
+          ? Math.min(10000, Math.max(0, Math.floor(ds)))
+          : 0,
+      yesterdayCommitmentStatus: statusSan,
+    };
+  }
 
   const parsed: IncomingMessage[] = [];
   for (const m of messagesRaw) {
@@ -373,12 +508,36 @@ export async function POST(req: Request) {
       { userAgent: ua },
     );
     const response = getInjectionResponse(type, userName);
-    return NextResponse.json({ reply: response });
+    return NextResponse.json({ reply: response, commitment: null });
+  }
+
+  const { emotion, intensity } = detectEmotion(sanitizedLast);
+  const cannedLines = getCannedPersonaLines(
+    kaiPersonaId,
+    emotion,
+    intensity,
+  );
+  const useCannedResponse =
+    Boolean(cannedLines?.length) &&
+    (emotion === "winning" ||
+      (emotion === "demotivated" && intensity === "high"));
+
+  if (useCannedResponse && cannedLines) {
+    const idx = Math.floor(Math.random() * cannedLines.length);
+    const reply = applyPersonaPlaceholders(
+      cannedLines[idx]!,
+      userName,
+      userGender,
+    );
+    return NextResponse.json({ reply, commitment: null });
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const client = new Anthropic({ apiKey });
   const mem = normalizeMemory(memoryRaw);
+
+  const personaStyle = PERSONA_INSTRUCTIONS[kaiPersonaId];
+  const emotionHint = buildEmotionContextForPrompt(emotion, intensity);
 
   const system = buildSystemPrompt(
     chatMode,
@@ -387,6 +546,9 @@ export async function POST(req: Request) {
     mem,
     userAgeGroup,
     userGoalType,
+    continuity,
+    personaStyle,
+    emotionHint,
   );
 
   try {
@@ -400,9 +562,15 @@ export async function POST(req: Request) {
     const textBlocks = response.content.filter(
       (b): b is Anthropic.Messages.TextBlock => b.type === "text",
     );
-    const reply = textBlocks.map((b) => b.text).join("").trim();
+    const rawReply = textBlocks.map((b) => b.text).join("").trim();
+    const commitment =
+      chatMode === "checkin" ? parseCommitmentFromReply(rawReply) : null;
+    const reply = stripKaiMachineLines(rawReply);
 
-    return NextResponse.json({ reply });
+    return NextResponse.json({
+      reply,
+      commitment: commitment ?? null,
+    });
   } catch (err) {
     console.error("[api/chat]", err);
     return NextResponse.json(

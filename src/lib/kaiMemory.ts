@@ -97,6 +97,13 @@ export function formatMemoryBlock(m: KaiMemory): string {
   return lines.join("\n");
 }
 
+/** Extract last COMMIT line from an assistant reply (server or client). */
+export function parseCommitmentFromReply(raw: string): string | null {
+  const commits = [...raw.matchAll(/^\s*COMMIT:\s*(.+)$/gim)];
+  const last = commits.at(-1);
+  return last?.[1]?.trim() || null;
+}
+
 /** Remove COMMIT/EXCUSE/WIN lines from visible chat text. */
 export function stripKaiMachineLines(raw: string): string {
   return raw

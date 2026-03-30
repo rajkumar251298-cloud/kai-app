@@ -10,6 +10,11 @@ import {
   type TodaysFocusResult,
 } from "@/lib/kaiTodaysFocus";
 import {
+  getCommitmentKey,
+  getCommitmentStatusKey,
+  yesterdayIso,
+} from "@/lib/checkinContinuity";
+import {
   ensureStreakProcessed,
   getDisplayedStreak,
 } from "@/lib/streakSystem";
@@ -77,6 +82,9 @@ export default function Home() {
   const [brainstormOpen, setBrainstormOpen] = useState(false);
   const [brainstormTopic, setBrainstormTopic] = useState("");
   const [focusKey, setFocusKey] = useState(0);
+  const [yesterdayCommitment, setYesterdayCommitment] = useState<
+    string | null
+  >(null);
 
   const refreshFocus = useCallback(() => setFocusKey((k) => k + 1), []);
 
@@ -121,6 +129,14 @@ export default function Home() {
     });
   }, [focusKey]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const c = localStorage.getItem(getCommitmentKey(yesterdayIso()))?.trim();
+    queueMicrotask(() => {
+      setYesterdayCommitment(c && c.length > 0 ? c : null);
+    });
+  }, [focusKey]);
+
   const openBrainstorm = () => {
     setBrainstormTopic("");
     setBrainstormOpen(true);
@@ -142,6 +158,13 @@ export default function Home() {
   const markYesterdayNotDone = () => {
     writeKaiMemory({ lastCompleted: false });
     router.push("/chat?mode=checkin");
+  };
+
+  const setYesterdayCommitmentStatus = (status: "done" | "carried") => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(getCommitmentStatusKey(yesterdayIso()), status);
+    window.dispatchEvent(new CustomEvent("kai-checkin-updated"));
+    refreshFocus();
   };
 
   return (
@@ -178,6 +201,37 @@ export default function Home() {
           <h2 className="kai-heading mb-4 text-lg font-semibold tracking-[0.05em]">
             Today&apos;s Focus
           </h2>
+
+          {yesterdayCommitment ? (
+            <div
+              className="mb-5 rounded-r-xl border border-[rgba(201,168,76,0.22)] border-l-4 border-l-[#C9A84C] bg-black/50 py-3 pl-4 pr-3"
+              role="region"
+              aria-label="Yesterday's commitment"
+            >
+              <p className="text-[12px] font-medium uppercase tracking-[0.18em] text-[#C9A84C]">
+                Yesterday you committed to:
+              </p>
+              <p className="mt-2 text-[15px] italic leading-snug text-white">
+                {yesterdayCommitment}
+              </p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setYesterdayCommitmentStatus("done")}
+                  className="rounded-lg border border-[rgba(201,168,76,0.35)] bg-black/60 px-3 py-2 text-left text-sm text-[#E8DCC8] transition hover:border-[rgba(201,168,76,0.55)]"
+                >
+                  ✅ Done — let&apos;s build on it
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setYesterdayCommitmentStatus("carried")}
+                  className="rounded-lg border border-[rgba(201,168,76,0.2)] bg-black/40 px-3 py-2 text-left text-sm text-[#E8DCC8]/90 transition hover:border-[rgba(201,168,76,0.4)]"
+                >
+                  🔄 Not done — carrying forward
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {focus.blocked ? (
             <div className="space-y-4 text-sm leading-relaxed text-[#E8DCC8]">

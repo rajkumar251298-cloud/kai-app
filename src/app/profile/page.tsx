@@ -16,8 +16,6 @@ import {
   type UserGoal,
 } from "@/lib/goalSystem";
 import {
-  KAI_LS_CHECK_IN_TIME,
-  KAI_LS_USER_NAME,
   getStoredCheckInTime,
   getStoredHabitProfile,
   getStoredUserName,
@@ -44,6 +42,15 @@ import {
   scheduleNotifications,
   K_NOTIFY,
 } from "@/lib/notifications";
+import {
+  LS_KAI_PERSONA,
+  LS_USER_GENDER,
+  PERSONA_OPTIONS,
+  readKaiPersona,
+  readUserGender,
+  type KaiPersonaId,
+  type UserGenderPref,
+} from "@/lib/kaiRelationshipPersona";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -64,7 +71,6 @@ const BTN_ROW =
 const GOLD_CTA =
   "kai-btn-shimmer flex min-h-[48px] w-full items-center justify-center rounded-xl border border-[rgba(201,168,76,0.45)] bg-gradient-to-br from-[#C9A84C] to-[#F5E6B3] text-sm font-semibold text-black/90";
 
-const K_USER = KAI_LS_USER_NAME;
 const K_EMAIL = "kaiUserEmail";
 const K_SOUND = "kaiPrefsSound";
 const K_REMINDER = "kaiDailyReminderTime";
@@ -72,6 +78,21 @@ const KAI_APP_RATING_KEY = "kaiAppRating";
 
 const CONTACT_US_MAILTO =
   `mailto:contactkai26@gmail.com?subject=${encodeURIComponent("KAI App Support")}&body=${encodeURIComponent("Hi KAI Support Team,\n\n")}`;
+
+const PERSONA_SHORT: Record<KaiPersonaId, string> = {
+  parent: "Parent",
+  friend: "Best Friend",
+  coach: "Coach",
+  mentor: "Mentor",
+  advisor: "Advisor",
+  teammate: "Teammate",
+};
+
+function genderLabelUi(g: UserGenderPref): string {
+  if (g === "male") return "He / Him";
+  if (g === "female") return "She / Her";
+  return "They / Them or prefer not to say";
+}
 
 function initialsFromName(name: string | null): string {
   if (!name?.trim()) return "?";
@@ -123,6 +144,11 @@ export default function ProfilePage() {
   const [shareCopied, setShareCopied] = useState(false);
   const [earnedBadges, setEarnedBadges] = useState<Set<BadgeId>>(new Set());
   const shareToastTimer = useRef<number | null>(null);
+  const [kaiPersonaUi, setKaiPersonaUi] = useState<KaiPersonaId>("friend");
+  const [userGenderUi, setUserGenderUi] = useState<UserGenderPref>("neutral");
+  const [personaPickerOpen, setPersonaPickerOpen] = useState(false);
+  const [genderPickerOpen, setGenderPickerOpen] = useState(false);
+  const [personaFlash, setPersonaFlash] = useState(false);
 
   const refreshLocal = useCallback(() => {
     checkAndAwardBadges();
@@ -148,6 +174,8 @@ export default function ProfilePage() {
     setEmailDisplay(localStorage.getItem(K_EMAIL) || "Not set — add in a future update");
     const r = parseInt(localStorage.getItem(KAI_APP_RATING_KEY) ?? "0", 10);
     setSavedAppRating(r >= 1 && r <= 5 ? r : 0);
+    setKaiPersonaUi(readKaiPersona());
+    setUserGenderUi(readUserGender());
   }, []);
 
   useEffect(() => {
@@ -471,6 +499,47 @@ export default function ProfilePage() {
             Account
           </h2>
           <div className="space-y-2">
+            <div className="rounded-xl border border-[rgba(201,168,76,0.2)] bg-black/50 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-[#E8DCC8]/45">
+                Your KAI
+              </p>
+              <p className="mt-2 text-sm text-[#E8DCC8]">
+                KAI shows up as:{" "}
+                <span className="font-medium text-[#F5F0E8]">
+                  {
+                    PERSONA_OPTIONS.find((p) => p.id === kaiPersonaUi)?.emoji ??
+                    "👫"
+                  }{" "}
+                  {PERSONA_SHORT[kaiPersonaUi]}
+                </span>
+              </p>
+              <button
+                type="button"
+                className="mt-2 text-sm font-medium text-[#C9A84C] underline-offset-2 hover:underline"
+                onClick={() => setPersonaPickerOpen(true)}
+              >
+                Change
+              </button>
+              {personaFlash && (
+                <p className="mt-2 text-sm text-[#C9A84C]" role="status">
+                  KAI will feel different from your next conversation 😊
+                </p>
+              )}
+              <p className="mt-4 text-xs font-medium uppercase tracking-wide text-[#E8DCC8]/45">
+                How KAI addresses you
+              </p>
+              <p className="mt-1 text-sm text-[#E8DCC8]">
+                {genderLabelUi(userGenderUi)}
+              </p>
+              <button
+                type="button"
+                className="mt-2 text-sm font-medium text-[#C9A84C] underline-offset-2 hover:underline"
+                onClick={() => setGenderPickerOpen(true)}
+              >
+                Edit
+              </button>
+            </div>
+
             <button
               type="button"
               className={BTN_ROW}
@@ -763,6 +832,63 @@ export default function ProfilePage() {
               </button>
             </div>
           </form>
+        </ModalWrap>
+      )}
+
+      {personaPickerOpen && (
+        <ModalWrap
+          title="How should KAI show up?"
+          onClose={() => setPersonaPickerOpen(false)}
+        >
+          <div className="grid max-h-[min(70vh,520px)] gap-2 overflow-y-auto sm:grid-cols-2">
+            {PERSONA_OPTIONS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className="flex min-h-[44px] w-full flex-col items-start rounded-xl border border-[rgba(201,168,76,0.32)] bg-black px-4 py-3 text-left text-sm font-medium text-[#E8DCC8] transition hover:border-[rgba(201,168,76,0.5)] hover:text-[#F5F0E8]"
+                onClick={() => {
+                  localStorage.setItem(LS_KAI_PERSONA, p.id);
+                  setKaiPersonaUi(p.id);
+                  setPersonaPickerOpen(false);
+                  setPersonaFlash(true);
+                  window.setTimeout(() => setPersonaFlash(false), 4000);
+                }}
+              >
+                <span className="font-semibold text-[#F5F0E8]">
+                  {p.emoji} {p.title}
+                </span>
+                <span className="mt-1 text-xs leading-snug text-[#E8DCC8]/65">
+                  {p.description}
+                </span>
+              </button>
+            ))}
+          </div>
+        </ModalWrap>
+      )}
+
+      {genderPickerOpen && (
+        <ModalWrap
+          title="How do you identify?"
+          onClose={() => setGenderPickerOpen(false)}
+        >
+          <div className="flex flex-col gap-2">
+            {(["male", "female", "neutral"] as const).map((g) => (
+              <button
+                key={g}
+                type="button"
+                className={BTN_ROW}
+                onClick={() => {
+                  localStorage.setItem(LS_USER_GENDER, g);
+                  setUserGenderUi(g);
+                  setGenderPickerOpen(false);
+                  setPersonaFlash(true);
+                  window.setTimeout(() => setPersonaFlash(false), 4000);
+                }}
+              >
+                {genderLabelUi(g)}
+              </button>
+            ))}
+          </div>
         </ModalWrap>
       )}
 

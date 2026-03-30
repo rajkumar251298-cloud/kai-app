@@ -248,8 +248,11 @@ function DailyReflectionCard({ onPoints }: { onPoints?: () => void }) {
       if (!raw) return;
       const o = JSON.parse(raw) as { qIndex?: number; optIndex?: number };
       if (o.qIndex !== qIndex || typeof o.optIndex !== "number") return;
-      const kai = q.kaiByOption[o.optIndex] ?? "";
-      setSaved({ opt: o.optIndex, kai });
+      const optIndex = o.optIndex;
+      const kai = q.kaiByOption[optIndex] ?? "";
+      queueMicrotask(() => {
+        setSaved({ opt: optIndex, kai });
+      });
     } catch {
       /* ignore */
     }
@@ -333,7 +336,9 @@ export function HabitQuizTab({ onPoints }: Props) {
   const [quizPointsDone] = useState(() => habitQuizPointsAlreadyAwarded());
 
   useEffect(() => {
-    setSavedProfile(loadSavedProfile());
+    queueMicrotask(() => {
+      setSavedProfile(loadSavedProfile());
+    });
   }, []);
 
   const q = QUESTIONS[idx];
@@ -408,7 +413,6 @@ export function HabitQuizTab({ onPoints }: Props) {
   };
 
   const showProfileOnly = savedProfile && !retaking;
-  const showQuiz = !showProfileOnly;
 
   if (showProfileOnly) {
     return (

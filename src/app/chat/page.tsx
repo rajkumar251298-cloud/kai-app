@@ -5,13 +5,17 @@ import {
   getStoredUserName,
 } from "@/lib/kaiLocalProfile";
 import {
-  buildCheckinOpening,
-} from "@/lib/kaiTodaysFocus";
+  buildContinuityOpeningOrFallback,
+  detectMood,
+  getCheckinContinuityApiPayload,
+  saveCheckinForToday,
+} from "@/lib/checkinContinuity";
 import {
-  LS_USER_AGE_GROUP,
-  LS_USER_GOAL_TYPE,
+  readUserAgeGroup,
+  readUserGoalType,
   stuckOpeningForPersona,
 } from "@/lib/kaiPersona";
+import { readKaiPersona, readUserGender } from "@/lib/kaiRelationshipPersona";
 import {
   getPrimaryGoal,
   hasRatedGoalProgressToday,
@@ -23,6 +27,7 @@ import {
   parseAndApplyKaiMemoryFromReply,
   readKaiMemory,
   stripKaiMachineLines,
+  writeKaiMemory,
 } from "@/lib/kaiMemory";
 import { todayKey, tryAwardDailyCheckin } from "@/lib/kaiPoints";
 import {
@@ -209,7 +214,8 @@ function ChatInner() {
     if (mode === "ideas" && topic) {
       return `${OPENINGS.ideas}\n\n(Topic from home: ${topic})`;
     }
-    if (mode === "checkin") return buildCheckinOpening(readKaiMemory());
+    if (mode === "checkin")
+      return buildContinuityOpeningOrFallback(readKaiMemory());
     if (mode === "stuck") return stuckOpeningForPersona();
     return OPENINGS[mode];
   });
@@ -234,6 +240,7 @@ function ChatInner() {
   const [goalRatingNote, setGoalRatingNote] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const checkinPointsAwarded = useRef(false);
+  const pendingCommitmentRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined" || mode !== "plan") return;
@@ -253,7 +260,7 @@ function ChatInner() {
       return;
     }
     if (mode === "checkin") {
-      setOpeningLine(buildCheckinOpening(readKaiMemory()));
+      setOpeningLine(buildContinuityOpeningOrFallback(readKaiMemory()));
       return;
     }
     if (mode === "stuck") {
@@ -271,14 +278,29 @@ function ChatInner() {
     scrollToBottom();
   }, [messages, isAwaitingApi, streaming, scrollToBottom]);
 
-  const onStreamComplete = useCallback((full: string) => {
-    const { display } = parseAndApplyKaiMemoryFromReply(full);
-    setMessages((prev) => [
-      ...prev,
-      { id: newId(), role: "kai", content: display },
-    ]);
-    setStreaming(null);
-  }, []);
+  const onStreamComplete = useCallback(
+    (full: string) => {
+      const { display } = parseAndApplyKaiMemoryFromReply(full);
+      const commit = pendingCommitmentRef.current;
+      pendingCommitmentRef.current = null;
+      setMessages((prev) => {
+        if (mode === "checkin" && commit && typeof window !== "undefined") {
+          const mood = detectMood(
+            prev.map((m) => ({ role: m.role, content: m.content })),
+          );
+          saveCheckinForToday(commit, mood);
+          writeKaiMemory({
+            lastTask: commit,
+            lastCompleted: null,
+            commitmentDate: todayKey(),
+          });
+        }
+        return [...prev, { id: newId(), role: "kai", content: display }];
+      });
+      setStreaming(null);
+    },
+    [mode],
+  );
 
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
@@ -313,13 +335,14 @@ function ChatInner() {
     const userGoal =
       typeof window !== "undefined" ? getStoredUserGoal() : "";
     const userAgeGroup =
-      typeof window !== "undefined"
-        ? localStorage.getItem(LS_USER_AGE_GROUP) ?? ""
-        : "";
+      typeof window !== "undefined" ? readUserAgeGroup() : "";
     const userGoalType =
-      typeof window !== "undefined"
-        ? localStorage.getItem(LS_USER_GOAL_TYPE) ?? ""
-        : "";
+      typeof window !== "undefined" ? readUserGoalType() : "";
+
+    const continuityPayload =
+      mode === "checkin" && typeof window !== "undefined"
+        ? getCheckinContinuityApiPayload()
+        : null;
 
     try {
       const res = await fetch("/api/chat", {
@@ -333,9 +356,18 @@ function ChatInner() {
           memory: memoryForApi(),
           userAgeGroup,
           userGoalType,
+          kaiPersona:
+            typeof window !== "undefined" ? readKaiPersona() : "friend",
+          userGender:
+            typeof window !== "undefined" ? readUserGender() : "neutral",
+          ...(continuityPayload ?? {}),
         }),
       });
-      const data: { reply?: string; error?: string } = await res.json();
+      const data: {
+        reply?: string;
+        commitment?: string | null;
+        error?: string;
+      } = await res.json();
       if (!res.ok) {
         throw new Error(data.error ?? "Request failed");
       }
@@ -343,6 +375,10 @@ function ChatInner() {
       if (!reply) {
         throw new Error("Empty reply");
       }
+      pendingCommitmentRef.current =
+        mode === "checkin" && data.commitment?.trim()
+          ? data.commitment.trim()
+          : null;
       const pauseMs = 800 + Math.random() * 400;
       await new Promise((r) => window.setTimeout(r, pauseMs));
       setIsAwaitingApi(false);

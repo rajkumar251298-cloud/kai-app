@@ -18,6 +18,10 @@ import {
 import { getTotalPoints, todayKeyLocal } from "@/lib/kaiPoints";
 import { getStoredUserName } from "@/lib/kaiLocalProfile";
 import {
+  getLast7DaysCommitmentRows,
+  type WeekCommitmentRow,
+} from "@/lib/checkinContinuity";
+import {
   getDisplayedStreak,
   getLongestStreak,
   getWeekStreakCells,
@@ -62,6 +66,19 @@ function parseGameParam(
   return null;
 }
 
+function truncCommitment40(s: string): string {
+  const t = s.trim();
+  if (t.length <= 40) return t;
+  return `${t.slice(0, 37)}…`;
+}
+
+function commitmentStatusLabel(row: WeekCommitmentRow): string {
+  if (!row.commitment) return "⬜ No check-in";
+  if (row.status === "done") return "✅ Done";
+  if (row.status === "carried") return "🔄 Carried";
+  return "📌 Pending";
+}
+
 export function DashboardView() {
   const router = useRouter();
   const { session, loading: authLoading, isConfigured } = useAuth();
@@ -76,6 +93,7 @@ export function DashboardView() {
   const [localUserName, setLocalUserName] = useState<string | null>(null);
   const [goalsTick, setGoalsTick] = useState(0);
   const [streakTick, setStreakTick] = useState(0);
+  const [commitmentTick, setCommitmentTick] = useState(0);
   const [addGoalOpen, setAddGoalOpen] = useState(false);
   const [newGoalTitle, setNewGoalTitle] = useState("");
   const [newGoalCategory, setNewGoalCategory] =
@@ -154,6 +172,16 @@ export function DashboardView() {
     };
   }, []);
 
+  useEffect(() => {
+    const onCheckin = () => setCommitmentTick((t) => t + 1);
+    window.addEventListener("kai-checkin-updated", onCheckin);
+    window.addEventListener("focus", onCheckin);
+    return () => {
+      window.removeEventListener("kai-checkin-updated", onCheckin);
+      window.removeEventListener("focus", onCheckin);
+    };
+  }, []);
+
   const [weekCells, setWeekCells] = useState<
     ReturnType<typeof getWeekStreakCells>
   >([]);
@@ -161,12 +189,20 @@ export function DashboardView() {
   const [bestStreak, setBestStreak] = useState(0);
   const [dashGoals, setDashGoals] = useState<UserGoal[]>([]);
 
+  void commitmentTick;
+  const weekCommitmentRows = getLast7DaysCommitmentRows();
+  const followThrough7 = weekCommitmentRows.filter(
+    (r) => r.commitment && r.status === "done",
+  ).length;
+
   useEffect(() => {
     ensureStreakProcessed();
-    setWeekCells(getWeekStreakCells());
-    setStreakCount(getDisplayedStreak());
-    setBestStreak(getLongestStreak());
-    setDashGoals(loadUserGoals());
+    queueMicrotask(() => {
+      setWeekCells(getWeekStreakCells());
+      setStreakCount(getDisplayedStreak());
+      setBestStreak(getLongestStreak());
+      setDashGoals(loadUserGoals());
+    });
   }, [streakTick, goalsTick]);
 
   useEffect(() => {
@@ -327,6 +363,49 @@ export function DashboardView() {
                 Tap for streak summary
               </p>
             </button>
+
+            <section className={CARD}>
+              <h2 className="kai-heading mb-4 text-sm font-semibold tracking-[0.05em]">
+                This Week&apos;s Commitments
+              </h2>
+              <ul className="space-y-3">
+                {weekCommitmentRows.map((row) => (
+                  <li
+                    key={row.date}
+                    className="flex flex-col gap-1 border-b border-[rgba(201,168,76,0.08)] pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+                  >
+                    <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-[#C9A84C]/90 sm:w-10">
+                      {row.dayLabel}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] leading-snug text-[#E8DCC8]/90">
+                        {row.commitment
+                          ? truncCommitment40(row.commitment)
+                          : "—"}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs text-[#E8DCC8]/65 sm:text-right">
+                      {commitmentStatusLabel(row)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-5">
+                <p className="text-center text-sm font-medium text-[#C9A84C]">
+                  Follow-through rate this week: {followThrough7}/7 ⚡
+                </p>
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[rgba(201,168,76,0.12)]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#8a7228] via-[#C9A84C] to-[#F5E6B3] transition-[width] duration-300"
+                    style={{ width: `${(followThrough7 / 7) * 100}%` }}
+                    role="progressbar"
+                    aria-valuenow={followThrough7}
+                    aria-valuemin={0}
+                    aria-valuemax={7}
+                  />
+                </div>
+              </div>
+            </section>
 
             <section className={CARD}>
               <h2 className="kai-heading mb-4 text-sm font-semibold tracking-[0.05em]">

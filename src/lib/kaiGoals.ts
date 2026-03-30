@@ -14,7 +14,8 @@ export function loadGoals(): KaiGoal[] {
   return loadUserGoals().map((g) => ({ id: g.id, text: g.title }));
 }
 
-export function saveGoals(_goals: KaiGoal[]): void {
+export function saveGoals(goals: KaiGoal[]): void {
+  void goals;
   /* no-op: use goalSystem.saveGoals */
 }
 

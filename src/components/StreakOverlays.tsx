@@ -2,7 +2,7 @@
 
 import { OPEN_STREAK_POPUP } from "@/components/StreakPopup";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 type BrokenDetail = { previousStreak: number; longestStreak: number };
 type FreezeDetail = { protectedStreak: number };
